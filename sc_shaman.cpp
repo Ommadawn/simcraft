@@ -593,9 +593,8 @@ static void trigger_tier8_4pc_elemental( spell_t* s )
       base_cost       = 0;
       base_multiplier = 1.0;
       tick_power_mod  = 0;
-      // FIX ME! I shamelessly copied from the hunters piercing shots and currently there is no information about those values.
-      base_tick_time  = 1.0;
-      num_ticks       = 4;
+      base_tick_time  = 2.0;
+      num_ticks       = 2;
     }
     void player_buff() {}
     void target_debuff( int dmg_type ) {}
@@ -615,7 +614,7 @@ static void trigger_tier8_4pc_elemental( spell_t* s )
     p -> active_lightning_bolt_dot -> cancel();
   }
 
-  p -> active_lightning_bolt_dot -> base_td = dmg / 4;
+  p -> active_lightning_bolt_dot -> base_td = dmg / p -> active_lightning_bolt_dot -> num_ticks;
   p -> active_lightning_bolt_dot -> schedule_tick();
 }
 
@@ -1243,10 +1242,10 @@ struct lightning_bolt_t : public shaman_spell_t
       trigger_tier5_4pc_elemental( this );
       if ( result == RESULT_CRIT )
       {
-	if ( p -> tiers.t8_4pc_elemental ) 
-	{
-	  trigger_tier8_4pc_elemental( this );
-	}
+		if ( p -> tiers.t8_4pc_elemental ) 
+		{
+		  trigger_tier8_4pc_elemental( this );
+		}
       }
     }
     p -> buffs_electrifying_wind -> trigger();
@@ -1442,7 +1441,7 @@ struct shamans_swiftness_t : public shaman_spell_t
     shaman_t* p = player -> cast_shaman();
     check_talent( p -> talents.natures_swiftness );
     trigger_gcd = 0;
-    cooldown = sim -> P320 ? 120.0 : 180.0;
+    cooldown = sim -> 120.0;
     if ( ! options_str.empty() )
     {
       // This will prevent Natures Swiftness from being called before the desired "free spell" is ready to be cast.
@@ -1689,8 +1688,6 @@ struct wind_shear_t : public shaman_spell_t
   {
     shaman_t* p = player -> cast_shaman();
     shaman_spell_t::execute();
-    p -> buffs_stonebreaker -> trigger();
-    p -> buffs_tundra       -> trigger();
   }
 
   virtual bool ready()
@@ -3144,7 +3141,6 @@ void shaman_t::init_actions()
           action_list_str += items[ i ].name();
         }
       }
-      action_list_str += "/wind_shear";
       action_list_str += "/mana_spring_totem/wrath_of_air_totem";
       if ( talents.totem_of_wrath ) action_list_str += "/totem_of_wrath";
       action_list_str += "/speed_potion";
