@@ -11,6 +11,8 @@
 
 enum element_type_t { ELEMENT_NONE=0, ELEMENT_AIR, ELEMENT_EARTH, ELEMENT_FIRE, ELEMENT_WATER, ELEMENT_MAX };
 
+enum imbue_type_t { IMBUE_NONE=0, FLAMETONGUE_IMBUE, WINDFURY_IMBUE };
+
 struct shaman_t : public player_t
 {
   pet_t* active_totems[ ELEMENT_MAX ];
@@ -324,6 +326,8 @@ struct spirit_wolf_pet_t : public pet_t
   }
   virtual void init_base()
   {
+    pet_t::init_base();
+
     attribute_base[ ATTR_STRENGTH  ] = 331;
     attribute_base[ ATTR_AGILITY   ] = 113;
     attribute_base[ ATTR_STAMINA   ] = 361;
@@ -332,7 +336,6 @@ struct spirit_wolf_pet_t : public pet_t
 
     base_attack_power = -20;
     initial_attack_power_per_strength = 2.0;
-    initial_attack_crit_per_agility = rating_t::interpolate( level, 0.01/25.0, 0.01/40.0, 0.01/83.3 );
 
     melee = new melee_t( this );
   }
@@ -411,7 +414,7 @@ static void trigger_flametongue_weapon( attack_t* a )
   };
 
   if ( a -> weapon &&
-       a -> weapon -> buff == FLAMETONGUE )
+       a -> weapon -> buff_type == FLAMETONGUE_IMBUE )
   {
     shaman_t* p = a -> player -> cast_shaman();
 
@@ -451,14 +454,14 @@ static void trigger_windfury_weapon( attack_t* a )
     virtual void player_buff()
     {
       shaman_attack_t::player_buff();
-      player_attack_power += weapon -> buff_bonus;
+      player_attack_power += weapon -> buff_value;
     }
   };
 
   shaman_t* p = a -> player -> cast_shaman();
 
   if ( a -> weapon == 0 ) return;
-  if ( a -> weapon -> buff != WINDFURY ) return;
+  if ( a -> weapon -> buff_type != WINDFURY_IMBUE ) return;
 
   if ( ! a -> sim -> cooldown_ready( p -> _cooldowns.windfury_weapon ) ) return;
 
@@ -874,7 +877,7 @@ struct lava_lash_t : public shaman_attack_t
   {
     shaman_t* p = player -> cast_shaman();
     shaman_attack_t::player_buff();
-    if ( weapon -> buff == FLAMETONGUE )
+    if ( weapon -> buff_type == FLAMETONGUE_IMBUE )
     {
       player_multiplier *= 1.25 + p -> glyphs.lava_lash * 0.10;
     }
@@ -1000,8 +1003,8 @@ void shaman_spell_t::player_buff()
   }
   if ( p -> glyphs.flametongue_weapon )
   {
-    if ( p -> main_hand_weapon.buff == FLAMETONGUE ||
-         p ->  off_hand_weapon.buff == FLAMETONGUE )
+    if ( p -> main_hand_weapon.buff_type == FLAMETONGUE_IMBUE ||
+         p ->  off_hand_weapon.buff_type == FLAMETONGUE_IMBUE )
     {
       player_crit += 0.02;
     }
@@ -1503,8 +1506,8 @@ struct earth_shock_t : public shaman_spell_t
 
     if ( p -> glyphs.shocking )
     {
-      trigger_gcd = 0.5;
-      min_gcd     = 0.5;
+      trigger_gcd = 1.0;
+      min_gcd     = 1.0;
     }
   }
 
@@ -1576,8 +1579,8 @@ struct frost_shock_t : public shaman_spell_t
 
     if ( p -> glyphs.shocking )
     {
-      trigger_gcd = 0.5;
-      min_gcd     = 0.5;
+      trigger_gcd = 1.0;
+      min_gcd     = 1.0;
     }
   }
 
@@ -1650,8 +1653,8 @@ struct flame_shock_t : public shaman_spell_t
 
     if ( p -> glyphs.shocking )
     {
-      trigger_gcd = 0.5;
-      min_gcd     = 0.5;
+      trigger_gcd = 1.0;
+      min_gcd     = 1.0;
     }
 
     observer = &( p -> active_flame_shock );
@@ -2171,22 +2174,22 @@ struct flametongue_weapon_t : public shaman_spell_t
 
     if ( main )
     {
-      player -> main_hand_weapon.buff = FLAMETONGUE;
-      player -> main_hand_weapon.buff_bonus = bonus_power;
+      player -> main_hand_weapon.buff_type  = FLAMETONGUE_IMBUE;
+      player -> main_hand_weapon.buff_value = bonus_power;
     }
     if ( off )
     {
-      player -> off_hand_weapon.buff = FLAMETONGUE;
-      player -> off_hand_weapon.buff_bonus = bonus_power;
+      player -> off_hand_weapon.buff_type  = FLAMETONGUE_IMBUE;
+      player -> off_hand_weapon.buff_value = bonus_power;
     }
   };
 
   virtual bool ready()
   {
-    if ( main && ( player -> main_hand_weapon.buff != FLAMETONGUE ) )
+    if ( main && ( player -> main_hand_weapon.buff_type != FLAMETONGUE_IMBUE ) )
       return true;
 
-    if ( off && ( player -> off_hand_weapon.buff != FLAMETONGUE ) )
+    if ( off && ( player -> off_hand_weapon.buff_type != FLAMETONGUE_IMBUE ) )
       return true;
 
     return false;
@@ -2246,22 +2249,22 @@ struct windfury_weapon_t : public shaman_spell_t
 
     if ( main )
     {
-      player -> main_hand_weapon.buff = WINDFURY;
-      player -> main_hand_weapon.buff_bonus = bonus_power;
+      player -> main_hand_weapon.buff_type  = WINDFURY_IMBUE;
+      player -> main_hand_weapon.buff_value = bonus_power;
     }
     if ( off )
     {
-      player -> off_hand_weapon.buff = WINDFURY;
-      player -> off_hand_weapon.buff_bonus = bonus_power;
+      player -> off_hand_weapon.buff_type  = WINDFURY_IMBUE;
+      player -> off_hand_weapon.buff_value = bonus_power;
     }
   };
 
   virtual bool ready()
   {
-    if ( main && ( player -> main_hand_weapon.buff != WINDFURY ) )
+    if ( main && ( player -> main_hand_weapon.buff_type != WINDFURY_IMBUE ) )
       return true;
 
-    if ( off && ( player -> off_hand_weapon.buff != WINDFURY ) )
+    if ( off && ( player -> off_hand_weapon.buff_type != WINDFURY_IMBUE ) )
       return true;
 
     return false;
@@ -2960,6 +2963,7 @@ void shaman_t::init_items()
 
   if      ( totem == "stonebreakers_totem"        ) totems.stonebreaker = 1;
   else if ( totem == "totem_of_dueling"           ) totems.dueling = 1;
+  else if ( totem == "totem_of_electrifying_wind" ) totems.electrifying_wind = 1;
   else if ( totem == "totem_of_hex"               ) totems.hex = 1;
   else if ( totem == "totem_of_indomitability"    ) totems.indomitability = 1;
   else if ( totem == "totem_of_splintering"       ) totems.splintering = 1;
@@ -3049,7 +3053,7 @@ void shaman_t::init_buffs()
   // stat_buff_t( sim, player, name, stat, amount, max_stack, duration, cooldown, proc_chance, quiet )
 
   buffs_dueling           = new stat_buff_t( sim, this, "dueling",           STAT_HASTE_RATING,  60, 1,  6.0, 10.01, totems.dueling        );
-  buffs_electrifying_wind = new stat_buff_t( sim, this, "electrifying_wind", STAT_HASTE_RATING, 200, 1, 12.0, 20.01, totems.electrifying_wind * 0.70 );
+  buffs_electrifying_wind = new stat_buff_t( sim, this, "electrifying_wind", STAT_HASTE_RATING, 200, 1, 12.0,  6.01, totems.electrifying_wind * 0.70 );
   buffs_indomitability    = new stat_buff_t( sim, this, "indomitability",    STAT_ATTACK_POWER, 120, 1, 10.0, 10.01, totems.indomitability );
   buffs_quaking_earth     = new stat_buff_t( sim, this, "quaking_earth",     STAT_ATTACK_POWER, 200, 1, 18.0, 20.01, totems.quaking_earth * 0.80 );
   buffs_stonebreaker      = new stat_buff_t( sim, this, "stonebreaker",      STAT_ATTACK_POWER, 110, 1, 10.0, 10.01, totems.stonebreaker   );
@@ -3206,13 +3210,13 @@ double shaman_t::composite_spell_power( int school ) SC_CONST
     sp += composite_attack_power() * 0.30 * talents.mental_quickness / 3.0;
   }
 
-  if ( main_hand_weapon.buff == FLAMETONGUE )
+  if ( main_hand_weapon.buff_type == FLAMETONGUE_IMBUE )
   {
-    sp += main_hand_weapon.buff_bonus;
+    sp += main_hand_weapon.buff_value;
   }
-  if ( off_hand_weapon.buff == FLAMETONGUE )
+  if ( off_hand_weapon.buff_type == FLAMETONGUE_IMBUE )
   {
-    sp += off_hand_weapon.buff_bonus;
+    sp += off_hand_weapon.buff_value;
   }
 
   sp += buffs_totem_of_wrath_glyph -> value();

@@ -241,6 +241,8 @@ struct shadow_fiend_pet_t : public pet_t
   }
   virtual void init_base()
   {
+    pet_t::init_base();
+
     attribute_base[ ATTR_STRENGTH  ] = 153;
     attribute_base[ ATTR_AGILITY   ] = 108;
     attribute_base[ ATTR_STAMINA   ] = 280;
@@ -1033,6 +1035,9 @@ struct devouring_plague_burst_t : public priest_spell_t
                                 p -> talents.improved_devouring_plague * 0.05 );
 
     base_hit += p -> talents.shadow_focus * 0.01;
+
+    // This helps log file and decouples the sooth RNG from the ticks.
+    name_str = "devouring_plague_burst";
   }
 
   virtual void execute()

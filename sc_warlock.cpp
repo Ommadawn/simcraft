@@ -9,6 +9,8 @@
 // Warlock
 // ==========================================================================
 
+enum stone_type_t { STONE_NONE=0, SPELL_STONE, FIRE_STONE };
+
 struct warlock_pet_t;
 
 struct warlock_t : public player_t
@@ -263,6 +265,8 @@ struct warlock_pet_t : public pet_t
 
   virtual void init_base()
   {
+    pet_t::init_base();
+
     warlock_t* o = owner -> cast_warlock();
 
     attribute_base[ ATTR_STRENGTH  ] = 314;
@@ -278,7 +282,6 @@ struct warlock_pet_t : public pet_t
                                                               o -> talents.fel_vitality  * 0.05 );
 
     initial_attack_power_per_strength = 2.0;
-    initial_attack_crit_per_agility   = rating_t::interpolate( level, 0.01/16.0, 0.01/24.9, 0.01/52.1 );
 
     health_per_stamina = 10;
     mana_per_intellect = 10.8;
@@ -1291,14 +1294,14 @@ void warlock_spell_t::target_debuff( int dmg_type )
       }
     }
 
-    if ( p -> main_hand_weapon.buff == SPELL_STONE )
+    if ( p -> main_hand_weapon.buff_type == SPELL_STONE )
     {
       stone_bonus = 0.01;
     }
   }
   else
   {
-    if ( p -> main_hand_weapon.buff == FIRE_STONE )
+    if ( p -> main_hand_weapon.buff_type == FIRE_STONE )
     {
       stone_bonus = 0.01;
     }
@@ -3510,13 +3513,13 @@ struct fire_stone_t : public warlock_spell_t
   {
     if ( sim -> log ) log_t::output( sim, "%s performs %s", player -> name(), name() );
 
-    player -> main_hand_weapon.buff = FIRE_STONE;
+    player -> main_hand_weapon.buff_type = FIRE_STONE;
     player -> spell_crit += bonus_crit / player -> rating.spell_crit;
   };
 
   virtual bool ready()
   {
-    return( player -> main_hand_weapon.buff != FIRE_STONE );
+    return( player -> main_hand_weapon.buff_type != FIRE_STONE );
   }
 };
 
@@ -3543,14 +3546,14 @@ struct spell_stone_t : public warlock_spell_t
   {
     if ( sim -> log ) log_t::output( sim, "%s performs %s", player -> name(), name() );
 
-    player -> main_hand_weapon.buff = SPELL_STONE;
+    player -> main_hand_weapon.buff_type = SPELL_STONE;
     player -> haste_rating += bonus_haste;
     player -> recalculate_haste();
   };
 
   virtual bool ready()
   {
-    return( player -> main_hand_weapon.buff != SPELL_STONE );
+    return( player -> main_hand_weapon.buff_type != SPELL_STONE );
   }
 };
 

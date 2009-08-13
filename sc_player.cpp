@@ -1517,13 +1517,14 @@ void player_t::reset()
   in_combat = false;
   iteration_dmg = 0;
 
-  main_hand_weapon.buff = WEAPON_BUFF_NONE;
-  off_hand_weapon.buff = WEAPON_BUFF_NONE;
-  ranged_weapon.buff = WEAPON_BUFF_NONE;
+  main_hand_weapon.buff_type  = 0;
+  main_hand_weapon.buff_value = 0;
 
-  main_hand_weapon.buff_bonus = 0;
-  off_hand_weapon.buff_bonus = 0;
-  ranged_weapon.buff_bonus = 0;
+  off_hand_weapon.buff_type  = 0;
+  off_hand_weapon.buff_value = 0;
+
+  ranged_weapon.buff_type  = 0;
+  ranged_weapon.buff_value = 0;
 
   elixir_battle   = ELIXIR_NONE;
   elixir_guardian = ELIXIR_NONE;
@@ -2445,6 +2446,7 @@ struct use_item_t : public action_t
   spell_t* discharge;
   action_callback_t* trigger;
   stat_buff_t* buff;
+  std::string use_name;
 
   use_item_t( player_t* player, const std::string& options_str ) :
       action_t( ACTION_OTHER, "use_item", player ),
@@ -2478,16 +2480,18 @@ struct use_item_t : public action_t
 
     item_t::special_effect_t& e = item -> use;
 
+    use_name = e.name_str.empty() ? item_name : e.name_str;
+
     if ( e.trigger_type )
     {
       if ( e.stat )
       {
-        trigger = unique_gear_t::register_stat_proc( e.trigger_type, e.trigger_mask, item_name, player,
+        trigger = unique_gear_t::register_stat_proc( e.trigger_type, e.trigger_mask, use_name, player,
                                                      e.stat, e.max_stacks, e.amount, e.proc_chance, 0, 0 );
       }
       else if ( e.school )
       {
-        trigger = unique_gear_t::register_discharge_proc( e.trigger_type, e.trigger_mask, item_name, player,
+        trigger = unique_gear_t::register_discharge_proc( e.trigger_type, e.trigger_mask, use_name, player,
                                                           e.max_stacks, e.school, e.amount, e.amount, e.proc_chance, 0 );
       }
 
@@ -2510,14 +2514,14 @@ struct use_item_t : public action_t
         }
       };
 
-      discharge = new discharge_spell_t( item -> name(), player, e.amount, e.school );
+      discharge = new discharge_spell_t( use_name.c_str(), player, e.amount, e.school );
     }
     else if ( e.stat )
     {
       if( e.max_stacks  <= 0 ) e.max_stacks  = 1;
       if( e.proc_chance <= 0 ) e.proc_chance = 1;
       
-      buff = new stat_buff_t( sim, player, item -> name(), e.stat, e.amount, e.max_stacks, e.duration, 0, e.proc_chance );
+      buff = new stat_buff_t( sim, player, use_name, e.stat, e.amount, e.max_stacks, e.duration, 0, e.proc_chance );
     }
     else assert( false );
 
@@ -2533,7 +2537,7 @@ struct use_item_t : public action_t
     }
     else if ( trigger )
     {
-      if ( sim -> log ) log_t::output( sim, "%s performs %s", player -> name(), item -> name() );
+      if ( sim -> log ) log_t::output( sim, "%s performs %s", player -> name(), use_name.c_str() );
 
       trigger -> activate();
 
@@ -2560,7 +2564,7 @@ struct use_item_t : public action_t
     }
     else if( buff )
     {
-      if ( sim -> log ) log_t::output( sim, "%s performs %s", player -> name(), item -> name() );
+      if ( sim -> log ) log_t::output( sim, "%s performs %s", player -> name(), use_name.c_str() );
 
       buff -> trigger();
     }
@@ -2888,28 +2892,15 @@ bool player_t::save( FILE* file, int save_type )
     for ( int i=0; i < SLOT_MAX; i++ )
     {
       item_t& item = items[ i ];
-      if ( item.active() && ( ! item.encoded_weapon_str.empty() || item.enchant != ENCHANT_NONE ) )
+      if ( ! item.active() ) continue;
+      if ( item.unique || item.unique_enchant || ! item.encoded_weapon_str.empty() )
       {
         util_t::fprintf( file, "# %s=%s", item.slot_name(), item.name() );
         if ( ! item.encoded_weapon_str.empty() ) util_t::fprintf( file, ",weapon=%s", item.encoded_weapon_str.c_str() );
-        if ( item.enchant != ENCHANT_NONE ) util_t::fprintf( file, ",enchant=%s", util_t::enchant_type_string( item.enchant ) );
+        if ( item.unique_enchant ) util_t::fprintf( file, ",enchant=%s", item.encoded_enchant_str.c_str() );
         util_t::fprintf( file, "\n" );
       }
     }
-
-    bool first = true;
-    int num_items = items.size();
-    for ( int i=0; i < num_items; i++ )
-    {
-      item_t& item = items[ i ];
-      if ( item.active() && ( item.use.active() || item.equip.active() || item.unique ) )
-      {
-        util_t::fprintf( file, "%s%s", ( first ? "# items=" : "/" ), item.name() );
-        first = false;
-      }
-    }
-
-    if ( ! first ) util_t::fprintf( file, "\n" );
   }
 
   return true;
