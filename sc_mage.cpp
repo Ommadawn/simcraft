@@ -45,7 +45,7 @@ struct mage_t : public player_t
   proc_t* procs_mana_gem;
 
   // Up-Times
-  uptime_t* uptimes_arcane_blast[ 4 ];
+  uptime_t* uptimes_arcane_blast[ 5 ];
   uptime_t* uptimes_dps_rotation;
   uptime_t* uptimes_dpm_rotation;
   uptime_t* uptimes_focus_magic_feedback;
@@ -667,7 +667,7 @@ static void trigger_ignite( spell_t* s,
     {
       mage_t* p = player -> cast_mage();
       mage_spell_t::tick();
-      if ( sim -> P320 && p -> talents.empowered_fire )
+      if ( p -> talents.empowered_fire )
       {
         if ( p -> rng_empowered_fire -> roll( p -> talents.empowered_fire / 3.0 ) )
         {
@@ -1001,18 +1001,6 @@ static void stack_improved_scorch( spell_t* s )
   }
 }
 
-// trigger_missile_barrage =========================================================
-
-static void trigger_missile_barrage( spell_t* s )
-{
-  mage_t* p = s -> player -> cast_mage();
-
-  if ( p -> talents.missile_barrage )
-  {
-    p -> buffs_missile_barrage -> trigger();
-  }
-}
-
 // trigger_replenishment ===========================================================
 
 static void trigger_replenishment( spell_t* s )
@@ -1215,7 +1203,7 @@ void mage_spell_t::player_buff()
 
     player_multiplier *= 1.0 + ab_stack * ( 0.15 + ( p -> glyphs.arcane_blast ? 0.03 : 0.00 ) );
 
-    for ( int i=0; i < 4; i++ )
+    for ( int i=0; i < ( sim -> P322 ? 5 : 4 ); i++ )
     {
       p -> uptimes_arcane_blast[ i ] -> update( i == ab_stack );
     }
@@ -1331,7 +1319,8 @@ struct arcane_barrage_t : public mage_spell_t
   {
     mage_t* p = player -> cast_mage();
     mage_spell_t::execute();
-    if ( result_is_hit() ) trigger_missile_barrage( this );
+    if ( result_is_hit() )     
+      p -> buffs_missile_barrage -> trigger();
     p -> buffs_arcane_blast -> expire();
   }
 };
@@ -1365,7 +1354,7 @@ struct arcane_blast_t : public mage_spell_t
     };
     init_rank( ranks );
 
-    if ( sim -> P320 ) base_cost *= 0.88;
+    base_cost *= 0.88;
 
     base_execute_time = 2.5;
     may_crit          = true;
@@ -1397,7 +1386,7 @@ struct arcane_blast_t : public mage_spell_t
     double c = mage_spell_t::cost();
     if ( c != 0 )
     {
-      c += base_cost * p -> buffs_arcane_blast -> stack() * 2.00;
+      c += base_cost * p -> buffs_arcane_blast -> stack() * ( sim -> P322 ? 1.30 : 2.00 );
       if ( p -> set_bonus.tier5_2pc() ) c += base_cost * 0.05;
     }
     return c;
@@ -1406,15 +1395,12 @@ struct arcane_blast_t : public mage_spell_t
   virtual void execute()
   {
     mage_t* p = player -> cast_mage();
-
     mage_spell_t::execute();
-
     if ( result_is_hit() )
     {
-      trigger_missile_barrage( this );
+      p -> buffs_missile_barrage -> trigger( 1, 1.0, p -> talents.missile_barrage * ( sim -> P322 ? 0.08 : 0.04 ) );
       trigger_tier8_2pc( this );
     }
-
     p -> buffs_arcane_blast -> increment();
   }
 
@@ -1557,6 +1543,15 @@ struct arcane_missiles_t : public mage_spell_t
     arcane_missiles_tick -> clearcast = p -> buffs_clearcasting -> up();
 
     mage_spell_t::execute();
+  }
+
+  virtual double cost() SC_CONST
+  {
+    mage_t* p = player -> cast_mage();
+    if ( sim -> P322 ) 
+      if ( p -> buffs_missile_barrage -> check() )
+	return 0;
+    return mage_spell_t::cost();
   }
 
   virtual void tick()
@@ -1737,6 +1732,12 @@ struct evocation_t : public mage_spell_t
   {
     mage_t* p = player -> cast_mage();
 
+    option_t options[] =
+    {
+      { NULL, OPT_UNKNOWN, NULL }
+    };
+    parse_options( options, options_str );
+
     base_tick_time = 2.0;
     num_ticks      = 4;
     channeled      = true;
@@ -1908,11 +1909,12 @@ struct fire_ball_t : public mage_spell_t
 
   virtual void execute()
   {
+    mage_t* p = player -> cast_mage();
     mage_spell_t::execute();
     duration_ready = 0; // Never wait for DoT component to finish.
     if ( result_is_hit() )
     {
-      trigger_missile_barrage( this );
+      p -> buffs_missile_barrage -> trigger();
       trigger_tier8_2pc( this );
     }
     trigger_hot_streak( this );
@@ -2300,14 +2302,12 @@ struct frost_bolt_t : public mage_spell_t
     };
     parse_options( options, options_str );
 
-    double pct = sim -> P320 ? 0.11 : 0.13;
-
     static rank_t ranks[] =
     {
-      { 80, 16, 803, 866, 0, pct },
-      { 79, 16, 799, 861, 0, pct },
-      { 75, 15, 702, 758, 0, pct },
-      { 70, 14, 630, 680, 0, pct },
+      { 80, 16, 803, 866, 0, 0.11 },
+      { 79, 16, 799, 861, 0, 0.11 },
+      { 75, 15, 702, 758, 0, 0.11 },
+      { 70, 14, 630, 680, 0, 0.11 },
       { 68, 13, 597, 644, 0, 330 },
       { 62, 12, 522, 563, 0, 300 },
       { 60, 11, 515, 555, 0, 290 },
@@ -2331,14 +2331,7 @@ struct frost_bolt_t : public mage_spell_t
     base_crit         += p -> talents.arcane_instability * 0.01;
     direct_power_mod  += p -> talents.empowered_frost_bolt * 0.05;
 
-    if ( sim -> P320 )
-    {
-      base_execute_time -= p -> talents.empowered_frost_bolt * 0.1;
-    }
-    else
-    {
-      base_crit += p -> talents.empowered_frost_bolt * 0.02;
-    }
+    base_execute_time -= p -> talents.empowered_frost_bolt * 0.1;
 
     base_crit_bonus_multiplier *= 1.0 + ( ( p -> talents.ice_shards  * 1.0/3 ) +
                                           ( p -> talents.spell_power * 0.25  ) +
@@ -2356,10 +2349,11 @@ struct frost_bolt_t : public mage_spell_t
 
   virtual void execute()
   {
+    mage_t* p = player -> cast_mage();
     mage_spell_t::execute();
     if ( result_is_hit() )
     {
-      trigger_missile_barrage( this );
+      p -> buffs_missile_barrage -> trigger();
       trigger_replenishment( this );
       trigger_tier8_2pc( this );
     }
@@ -2405,13 +2399,11 @@ struct ice_lance_t : public mage_spell_t
     };
     parse_options( options, options_str );
 
-    double pct = sim -> P320 ? 0.06 : 0.07;
-
     static rank_t ranks[] =
     {
-      { 80, 3, 223, 258, 0, pct },
-      { 78, 3, 221, 255, 0, pct },
-      { 72, 2, 182, 210, 0, pct },
+      { 80, 3, 223, 258, 0, 0.06 },
+      { 78, 3, 221, 255, 0, 0.06 },
+      { 72, 2, 182, 210, 0, 0.06 },
       { 66, 1, 161, 187, 0, 150 },
       { 0, 0, 0, 0, 0, 0 }
     };
@@ -2547,11 +2539,12 @@ struct frostfire_bolt_t : public mage_spell_t
 
   virtual void execute()
   {
+    mage_t* p = player -> cast_mage();
     mage_spell_t::execute();
     if ( ! dot_wait ) duration_ready = 0;
     if ( result_is_hit() )
     {
-      trigger_missile_barrage( this );
+      p -> buffs_missile_barrage -> trigger();
       trigger_tier8_2pc( this );
     }
     trigger_hot_streak( this );
@@ -3191,7 +3184,7 @@ void mage_t::init_buffs()
 
   // buff_t( sim, player, name, max_stack, duration, cooldown, proc_chance, quiet )
 
-  buffs_arcane_blast         = new buff_t( sim, this, "arcane_blast",         3, 10.0 );
+  buffs_arcane_blast         = new buff_t( sim, this, "arcane_blast",         ( sim -> P322 ? 4 : 3 ), 10.0 );
   buffs_arcane_power         = new buff_t( sim, this, "arcane_power",         1, ( glyphs.arcane_power ? 18.0 : 15.0 ) );
   buffs_brain_freeze         = new buff_t( sim, this, "brain_freeze",         1, 15.0, 0, talents.brain_freeze * 0.05 );
   buffs_clearcasting         = new buff_t( sim, this, "clearcasting",         1, 10.0, 0, talents.arcane_concentration * 0.02 );
@@ -3241,6 +3234,7 @@ void mage_t::init_uptimes()
   uptimes_arcane_blast[ 1 ]    = get_uptime( "arcane_blast_1" );
   uptimes_arcane_blast[ 2 ]    = get_uptime( "arcane_blast_2" );
   uptimes_arcane_blast[ 3 ]    = get_uptime( "arcane_blast_3" );
+  uptimes_arcane_blast[ 4 ]    = get_uptime( "arcane_blast_4" );
   uptimes_dps_rotation         = get_uptime( "dps_rotation" );
   uptimes_dpm_rotation         = get_uptime( "dpm_rotation" );
   uptimes_focus_magic_feedback = get_uptime( "focus_magic_feedback" );
@@ -3292,13 +3286,17 @@ void mage_t::init_actions()
     }
     if ( primary_tree() == TREE_ARCANE )
     {
-      action_list_str += "/mana_gem/evocation";
-      action_list_str += "/choose_rotation";
-      action_list_str += "/arcane_blast,max=2";
-      action_list_str += "/arcane_missiles,barrage=1,dpm=1";
-      action_list_str += "/arcane_blast,max=3";
+      action_list_str += "/mana_gem";
+      action_list_str += "/choose_rotation,P322=0";
+      action_list_str += "/evocation,P322=0";
+      action_list_str += "/arcane_blast,P322=0,max=2";
+      action_list_str += "/arcane_missiles,P322=0,barrage=1,dpm=1";
+      action_list_str += "/arcane_blast,P322=0,max=3";
+      action_list_str += "/arcane_missiles,P322=1,barrage=1";
+      action_list_str += "/arcane_blast,P322=1";
       action_list_str += "/arcane_missiles";
       action_list_str += "/mana_potion";
+      action_list_str += "/evocation";
       if ( talents.arcane_barrage ) action_list_str += "/arcane_barrage,moving=1"; // when moving
       action_list_str += "/fire_blast,moving=1"; // when moving
     }
@@ -3441,10 +3439,13 @@ double mage_t::resource_gain( int       resource,
 {
   double actual_amount = player_t::resource_gain( resource, amount, source, action );
 
-  if ( source != gains_evocation &&
-       source != gains_mana_gem )
+  if ( resource == RESOURCE_MANA )
   {
-    rotation.mana_gain += actual_amount;
+    if ( source != gains_evocation &&
+         source != gains_mana_gem )
+    {
+      rotation.mana_gain += actual_amount;
+    }
   }
 
   return actual_amount;
