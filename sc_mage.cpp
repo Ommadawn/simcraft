@@ -55,9 +55,7 @@ struct mage_t : public player_t
   rng_t* rng_empowered_fire;
   rng_t* rng_frostbite;
   rng_t* rng_ghost_charge;
-  rng_t* rng_improved_scorch;
   rng_t* rng_improved_water_elemental;
-  rng_t* rng_winters_chill;
   rng_t* rng_winters_grasp;
 
   // Options
@@ -87,6 +85,7 @@ struct mage_t : public player_t
     int  arcane_empowerment;
     int  arcane_flows;
     int  arcane_focus;
+    int  arcane_fortitude;
     int  arcane_impact;
     int  arcane_instability;
     int  arcane_meditation;
@@ -172,7 +171,7 @@ struct mage_t : public player_t
   };
   glyphs_t glyphs;
 
-  mage_t( sim_t* sim, const std::string& name ) : player_t( sim, MAGE, name )
+  mage_t( sim_t* sim, const std::string& name, int race_type = RACE_NONE ) : player_t( sim, MAGE, name, race_type )
   {
     // Active
     active_ignite          = 0;
@@ -184,6 +183,7 @@ struct mage_t : public player_t
   }
 
   // Character Definition
+  virtual void      init_race();
   virtual void      init_base();
   virtual void      init_glyphs();
   virtual void      init_buffs();
@@ -203,6 +203,7 @@ struct mage_t : public player_t
   virtual int       primary_resource() SC_CONST { return RESOURCE_MANA; }
   virtual int       primary_role() SC_CONST     { return ROLE_SPELL; }
   virtual int       primary_tree() SC_CONST;
+  virtual double    composite_armor() SC_CONST;
   virtual double    composite_spell_power( int school ) SC_CONST;
   virtual double    composite_spell_hit() SC_CONST;
 
@@ -212,62 +213,7 @@ struct mage_t : public player_t
   virtual double resource_loss( int resource, double amount, action_t* action=0 );
 };
 
-namespace   // ANONYMOUS NAMESPACE ==========================================
-{
-
-// stack_winters_chill =====================================================
-
-static void stack_winters_chill( spell_t* s,
-                                 double   chance )
-{
-  if ( s -> school != SCHOOL_FROST &&
-       s -> school != SCHOOL_FROSTFIRE ) return;
-
-  struct expiration_t : public event_t
-  {
-    expiration_t( sim_t* sim ) : event_t( sim )
-    {
-      name = "Winters Chill Expiration";
-      sim -> add_event( this, 15.0 );
-    }
-    virtual void execute()
-    {
-      if ( sim -> log ) log_t::output( sim, "Target %s loses Winters Chill", sim -> target -> name() );
-      sim -> target -> debuffs.winters_chill = 0;
-      sim -> target -> expirations.winters_chill = 0;
-    }
-  };
-
-  if ( chance < 1.0 )
-  {
-    mage_t* p = s -> player -> cast_mage();
-
-    if ( p -> rng_winters_chill -> roll( chance ) )
-      return;
-  }
-
-  target_t* t = s -> sim -> target;
-
-  if ( t -> debuffs.winters_chill < 5 )
-  {
-    t -> debuffs.winters_chill += 1;
-
-    if ( s -> sim -> log )
-      log_t::output( s -> sim, "Target %s gains Winters Chill %d",
-                     t -> name(), t -> debuffs.winters_chill );
-  }
-
-  event_t*& e = t -> expirations.winters_chill;
-
-  if ( e )
-  {
-    e -> reschedule( 15.0 );
-  }
-  else
-  {
-    e = new ( s -> sim ) expiration_t( s -> sim );
-  }
-}
+namespace { // ANONYMOUS NAMESPACE ==========================================
 
 // ==========================================================================
 // Mage Spell
@@ -426,7 +372,7 @@ struct mirror_image_pet_t : public pet_t
       spell_t::execute();
       if ( o -> glyphs.mirror_image && result_is_hit() )
       {
-        stack_winters_chill( this, 1.00 );
+	sim -> target -> debuffs.winters_chill -> trigger();
       }
       if ( next_in_sequence )
       {
@@ -528,6 +474,19 @@ struct mirror_image_pet_t : public pet_t
     dismiss(); // FIXME! Interrupting them is too hard, just dismiss for now.
   }
 };
+
+// stack_winters_chill =====================================================
+
+static void stack_winters_chill( spell_t* s )
+{
+  if ( s -> school != SCHOOL_FROST &&
+       s -> school != SCHOOL_FROSTFIRE ) return;
+
+  mage_t*   p = s -> player -> cast_mage();
+  target_t* t = s -> sim -> target;
+
+  t -> debuffs.winters_chill -> trigger( 1, 1.0, p -> talents.winters_chill / 3.0 );
+}
 
 // trigger_tier5_4pc ========================================================
 
@@ -947,60 +906,6 @@ static void trigger_hot_streak( spell_t* s )
   }
 }
 
-// stack_improved_scorch =========================================================
-
-static void stack_improved_scorch( spell_t* s )
-{
-  mage_t* p = s -> player -> cast_mage();
-
-  if ( ! p -> talents.improved_scorch ) return;
-
-  struct expiration_t : public event_t
-  {
-    expiration_t( sim_t* sim ) : event_t( sim )
-    {
-      name = "Improved Scorch Expiration";
-      sim -> add_event( this, 30.0 );
-    }
-    virtual void execute()
-    {
-      if ( sim -> log ) log_t::output( sim, "%s loses Improved Scorch", sim -> target -> name() );
-      sim -> target -> debuffs.improved_scorch = 0;
-      sim -> target -> expirations.improved_scorch = 0;
-    }
-  };
-
-  if ( p -> rng_improved_scorch -> roll( p -> talents.improved_scorch / 3.0 ) )
-  {
-    target_t* t = s -> sim -> target;
-
-    if ( t -> debuffs.improved_scorch < 5 )
-    {
-      if ( p -> glyphs.improved_scorch )
-      {
-        t -> debuffs.improved_scorch += 5;
-        if ( t -> debuffs.improved_scorch > 5 ) t -> debuffs.improved_scorch = 5;
-      }
-      else
-      {
-        t -> debuffs.improved_scorch += 1;
-      }
-      if ( s -> sim -> log ) log_t::output( s -> sim, "%s gains Improved Scorch %d", t -> name(), t -> debuffs.improved_scorch );
-    }
-
-    event_t*& e = t -> expirations.improved_scorch;
-
-    if ( e )
-    {
-      e -> reschedule( 30.0 );
-    }
-    else
-    {
-      e = new ( s -> sim ) expiration_t( s -> sim );
-    }
-  }
-}
-
 // trigger_replenishment ===========================================================
 
 static void trigger_replenishment( spell_t* s )
@@ -1144,7 +1049,7 @@ void mage_spell_t::execute()
     trigger_arcane_concentration( this );
     trigger_frostbite( this );
     trigger_winters_grasp( this );
-    stack_winters_chill( this, p -> talents.winters_chill / 3.0 );
+    stack_winters_chill( this );
 
     if ( result == RESULT_CRIT )
     {
@@ -1870,9 +1775,7 @@ struct fire_ball_t : public mage_spell_t
     base_multiplier   *= 1.0 + p -> talents.fire_power * 0.02;
     base_multiplier   *= 1.0 + p -> talents.arcane_instability * 0.01;
     base_multiplier   *= 1.0 + p -> talents.spell_impact * 0.02;
-    base_crit         += p -> talents.arcane_instability * 0.01;
     base_crit         += p -> talents.critical_mass * 0.02;
-    base_crit         += p -> talents.pyromaniac * 0.01;
     direct_power_mod  += p -> talents.empowered_fire * 0.05;
 
     base_crit_bonus_multiplier *= 1.0 + ( ( p -> talents.spell_power * 0.25 ) +
@@ -1979,11 +1882,9 @@ struct fire_blast_t : public mage_spell_t
     cooldown         -= p -> talents.improved_fire_blast * 0.5;
     base_multiplier  *= 1.0 + p -> talents.fire_power * 0.02;
     base_multiplier  *= 1.0 + p -> talents.arcane_instability * 0.01;
-    base_crit        += p -> talents.arcane_instability * 0.01;
     base_multiplier  *= 1.0 + p -> talents.spell_impact * 0.02;
     base_crit        += p -> talents.incineration * 0.02;
     base_crit        += p -> talents.critical_mass * 0.02;
-    base_crit        += p -> talents.pyromaniac * 0.01;
 
     base_crit_bonus_multiplier *= 1.0 + ( ( p -> talents.spell_power * 0.25 ) +
                                           ( p -> talents.burnout     * 0.10 ) +
@@ -2034,9 +1935,7 @@ struct living_bomb_t : public mage_spell_t
     base_cost        *= 1.0 - util_t::talent_rank( p -> talents.frost_channeling, 3, 0.04, 0.07, 0.10 );
     base_multiplier  *= 1.0 + p -> talents.fire_power * 0.02;
     base_multiplier  *= 1.0 + p -> talents.arcane_instability * 0.01;
-    base_crit        += p -> talents.arcane_instability * 0.01;
     base_crit        += p -> talents.critical_mass * 0.02;
-    base_crit        += p -> talents.pyromaniac * 0.01;
 
     base_crit_bonus_multiplier *= 1.0 + ( ( p -> talents.spell_power * 0.25 ) +
                                           ( p -> talents.burnout     * 0.10 ) +
@@ -2130,9 +2029,7 @@ struct pyroblast_t : public mage_spell_t
     base_cost        *= 1.0 - util_t::talent_rank( p -> talents.frost_channeling, 3, 0.04, 0.07, 0.10 );
     base_multiplier  *= 1.0 + p -> talents.fire_power * 0.02;
     base_multiplier  *= 1.0 + p -> talents.arcane_instability * 0.01;
-    base_crit        += p -> talents.arcane_instability * 0.01;
     base_crit        += p -> talents.critical_mass * 0.02;
-    base_crit        += p -> talents.pyromaniac * 0.01;
     base_crit        += p -> talents.world_in_flames * 0.02;
 
     base_crit_bonus_multiplier *= 1.0 + ( ( p -> talents.spell_power * 0.25 ) +
@@ -2215,10 +2112,8 @@ struct scorch_t : public mage_spell_t
     base_multiplier  *= 1.0 + p -> talents.arcane_instability * 0.01;
     base_multiplier  *= 1.0 + p -> talents.spell_impact       * 0.02;
 
-    base_crit        += p -> talents.arcane_instability * 0.01;
     base_crit        += p -> talents.incineration       * 0.02;
     base_crit        += p -> talents.critical_mass      * 0.02;
-    base_crit        += p -> talents.pyromaniac         * 0.01;
 
     base_crit_bonus_multiplier *= 1.0 + ( ( p -> talents.spell_power * 0.25 ) +
                                           ( p -> talents.burnout     * 0.10 ) +
@@ -2231,8 +2126,13 @@ struct scorch_t : public mage_spell_t
 
   virtual void execute()
   {
+    mage_t* p = player -> cast_mage();
     mage_spell_t::execute();
-    if ( result_is_hit() ) stack_improved_scorch( this );
+    if ( result_is_hit() ) 
+    {
+      int stack = p -> glyphs.improved_scorch ? 5 : 1;
+      sim -> target -> debuffs.improved_scorch -> trigger( stack, 1.0, ( p -> talents.improved_scorch / 3.0 ) );
+    }
     trigger_hot_streak( this );
   }
 
@@ -2245,16 +2145,14 @@ struct scorch_t : public mage_spell_t
     {
       target_t* t = sim -> target;
 
-      if ( t -> debuffs.improved_shadow_bolt )
+      if ( t -> debuffs.improved_shadow_bolt -> check() )
         return false;
 
-      event_t* e = t -> expirations.improved_scorch;
-
-      if ( e && sim -> current_time < ( e -> occurs() - 6.0 ) )
+      if ( t -> debuffs.winters_chill -> check() )
         return false;
 
-      if ( ! e && t -> debuffs.improved_scorch > 0 ) // override scenario
-        return false;
+      if ( t -> debuffs.improved_scorch -> remains_gt( 6.0 ) )
+	return false;
     }
 
     return true;
@@ -2514,9 +2412,7 @@ struct frostfire_bolt_t : public mage_spell_t
     base_multiplier  *= 1.0 + p -> talents.piercing_ice * 0.02;
     base_multiplier  *= 1.0 + p -> talents.arctic_winds * 0.01;
     base_multiplier  *= 1.0 + p -> talents.chilled_to_the_bone * 0.01;
-    base_crit        += p -> talents.arcane_instability * 0.01;
     base_crit        += p -> talents.critical_mass * 0.02;
-    base_crit        += p -> talents.pyromaniac * 0.01;
     direct_power_mod += p -> talents.empowered_fire * 0.05;
 
     base_crit_bonus_multiplier *= 1.0 + ( ( p -> talents.ice_shards  * 1.0/3 ) +
@@ -2719,14 +2615,15 @@ struct arcane_brilliance_t : public mage_spell_t
 
     for ( player_t* p = sim -> player_list; p; p = p -> next )
     {
-      p -> buffs.arcane_brilliance = bonus;
+      if ( p -> type == PLAYER_GUARDIAN ) continue;
+      p -> buffs.arcane_brilliance -> trigger( 1, bonus );
       p -> init_resources( true );
     }
   }
 
   virtual bool ready()
   {
-    return( player -> buffs.arcane_brilliance < bonus );
+    return( player -> buffs.arcane_brilliance -> current_value < bonus );
   }
 };
 
@@ -3140,37 +3037,62 @@ void mage_t::init_glyphs()
     else if ( n == "ice_barrier"      ) ;
     else if ( n == "ice_block"        ) ;
     else if ( n == "icy_veins"        ) ;
+    else if ( n == "polymorph"        ) ;
     else if ( n == "slow_fall"        ) ;
     else if ( n == "the_penguin"      ) ;
     else if ( ! sim -> parent ) util_t::printf( "simcraft: Player %s has unrecognized glyph %s\n", name(), n.c_str() );
   }
 }
 
+// mage_t::init_race ======================================================
+
+void mage_t::init_race()
+{
+  race = util_t::parse_race_type( race_str );
+  switch ( race )
+  {
+  case RACE_HUMAN:
+  case RACE_DRAENEI:
+  case RACE_GNOME:
+  case RACE_UNDEAD:
+  case RACE_TROLL:
+  case RACE_BLOOD_ELF:
+    break;
+  default:
+    race = RACE_UNDEAD;
+    race_str = util_t::race_type_string( race );
+  }
+
+  player_t::init_race();
+}
+
+
 // mage_t::init_base =======================================================
 
 void mage_t::init_base()
 {
-  attribute_base[ ATTR_STRENGTH  ] =  35;
-  attribute_base[ ATTR_AGILITY   ] =  41;
-  attribute_base[ ATTR_STAMINA   ] =  60;
-  attribute_base[ ATTR_INTELLECT ] = 179;
-  attribute_base[ ATTR_SPIRIT    ] = 179;
+  attribute_base[ ATTR_STRENGTH  ] = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_STRENGTH );
+  attribute_base[ ATTR_AGILITY   ] = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_AGILITY );
+  attribute_base[ ATTR_STAMINA   ] = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_STAMINA );
+  attribute_base[ ATTR_INTELLECT ] = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_INTELLECT );
+  attribute_base[ ATTR_SPIRIT    ] = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_SPIRIT );
+  resource_base[ RESOURCE_HEALTH ] = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_HEALTH );
+  resource_base[ RESOURCE_MANA   ] = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_MANA );
+  base_spell_crit                  = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_SPELL_CRIT );
+  base_attack_crit                 = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_MELEE_CRIT );
+  initial_spell_crit_per_intellect = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_SPELL_CRIT_PER_INT );
+  initial_attack_crit_per_agility  = rating_t::get_attribute_base( level, MAGE, race, BASE_STAT_MELEE_CRIT_PER_AGI );
 
   attribute_multiplier_initial[ ATTR_INTELLECT ] *= 1.0 + talents.arcane_mind * 0.03;
-  attribute_multiplier_initial[ ATTR_SPIRIT    ] *= 1.0 + talents.student_of_the_mind * ( 0.1 / 3.0 );
+  attribute_multiplier_initial[ ATTR_SPIRIT    ] *= 1.0 + util_t::talent_rank( talents.student_of_the_mind, 3, 0.04, 0.07, 0.10 );
 
-  base_spell_crit = 0.00907381;
-  initial_spell_crit_per_intellect = rating_t::interpolate( level, 0.01/60.0, 0.01/80.0, 0.01/166.79732 );
+  base_spell_crit += talents.pyromaniac * 0.01;
+  base_spell_crit += talents.arcane_instability * 0.01;
+
   initial_spell_power_per_intellect = talents.mind_mastery * 0.03;
 
   base_attack_power = -10;
-  base_attack_crit  = 0.0345777;
   initial_attack_power_per_strength = 1.0;
-  initial_attack_crit_per_agility = rating_t::interpolate( level, 0.01/16.0, 0.01/24.9, 0.01/51.84598 );
-
-  // FIXME! Make this level-specific.
-  resource_base[ RESOURCE_HEALTH ] = 3200;
-  resource_base[ RESOURCE_MANA   ] = rating_t::interpolate( level, 1183, 2241, 3268 );
 
   health_per_stamina = 10;
   mana_per_intellect = 15;
@@ -3184,21 +3106,21 @@ void mage_t::init_buffs()
 
   // buff_t( sim, player, name, max_stack, duration, cooldown, proc_chance, quiet )
 
-  buffs_arcane_blast         = new buff_t( sim, this, "arcane_blast",         ( sim -> P322 ? 4 : 3 ), 10.0 );
-  buffs_arcane_power         = new buff_t( sim, this, "arcane_power",         1, ( glyphs.arcane_power ? 18.0 : 15.0 ) );
-  buffs_brain_freeze         = new buff_t( sim, this, "brain_freeze",         1, 15.0, 0, talents.brain_freeze * 0.05 );
-  buffs_clearcasting         = new buff_t( sim, this, "clearcasting",         1, 10.0, 0, talents.arcane_concentration * 0.02 );
-  buffs_combustion           = new buff_t( sim, this, "combustion",           3 );
-  buffs_fingers_of_frost     = new buff_t( sim, this, "fingers_of_frost",     2,    0, 0, talents.fingers_of_frost * 0.15/2 );
-  buffs_hot_streak_crits     = new buff_t( sim, this, "hot_streak_crits",     2,    0, 0, 1.0, true );
-  buffs_hot_streak           = new buff_t( sim, this, "hot_streak",           1, 10.0, 0, talents.hot_streak / 3.0 );
-  buffs_icy_veins            = new buff_t( sim, this, "icy_veins",            1, 20.0 );
-  buffs_incanters_absorption = new buff_t( sim, this, "incanters_absorption", 1, 10.0 );
-  buffs_missile_barrage      = new buff_t( sim, this, "missile_barrage",      1, 15.0, 0, talents.missile_barrage * 0.04 );
+  buffs_arcane_blast         = new buff_t( this, "arcane_blast",         ( sim -> P322 ? 4 : 3 ), 10.0 );
+  buffs_arcane_power         = new buff_t( this, "arcane_power",         1, ( glyphs.arcane_power ? 18.0 : 15.0 ) );
+  buffs_brain_freeze         = new buff_t( this, "brain_freeze",         1, 15.0, 0, talents.brain_freeze * 0.05 );
+  buffs_clearcasting         = new buff_t( this, "clearcasting",         1, 10.0, 0, talents.arcane_concentration * 0.02 );
+  buffs_combustion           = new buff_t( this, "combustion",           3 );
+  buffs_fingers_of_frost     = new buff_t( this, "fingers_of_frost",     2,    0, 0, talents.fingers_of_frost * 0.15/2 );
+  buffs_hot_streak_crits     = new buff_t( this, "hot_streak_crits",     2,    0, 0, 1.0, true );
+  buffs_hot_streak           = new buff_t( this, "hot_streak",           1, 10.0, 0, talents.hot_streak / 3.0 );
+  buffs_icy_veins            = new buff_t( this, "icy_veins",            1, 20.0 );
+  buffs_incanters_absorption = new buff_t( this, "incanters_absorption", 1, 10.0 );
+  buffs_missile_barrage      = new buff_t( this, "missile_barrage",      1, 15.0, 0, talents.missile_barrage * 0.04 );
 
-  buffs_ghost_charge = new buff_t( sim, this, "ghost_charge" );
-  buffs_mage_armor   = new buff_t( sim, this, "mage_armor" );
-  buffs_molten_armor = new buff_t( sim, this, "molten_armor" );
+  buffs_ghost_charge = new buff_t( this, "ghost_charge" );
+  buffs_mage_armor   = new buff_t( this, "mage_armor" );
+  buffs_molten_armor = new buff_t( this, "molten_armor" );
 }
 
 // mage_t::init_gains ======================================================
@@ -3250,9 +3172,7 @@ void mage_t::init_rng()
   rng_empowered_fire           = get_rng( "empowered_fire"           );
   rng_frostbite                = get_rng( "frostbite"                );
   rng_ghost_charge             = get_rng( "ghost_charge"             );
-  rng_improved_scorch          = get_rng( "improved_scorch"          );
   rng_improved_water_elemental = get_rng( "improved_water_elemental" );
-  rng_winters_chill            = get_rng( "winters_chill"            );
   rng_winters_grasp            = get_rng( "winters_grasp"            );
 }
 
@@ -3347,6 +3267,17 @@ int mage_t::primary_tree() SC_CONST
   if ( talents.empowered_frost_bolt ) return TREE_FROST;
 
   return TALENT_TREE_MAX;
+}
+
+// mage_t::composite_armor =========================================
+
+double mage_t::composite_armor() SC_CONST
+{
+  double a = player_t::composite_armor();
+
+  a += floor( talents.arcane_fortitude * 0.5 * intellect() );
+
+  return a;
 }
 
 // mage_t::composite_spell_power ===========================================
@@ -3489,7 +3420,7 @@ bool mage_t::get_talent_trees( std::vector<int*>& arcane,
     { {  1, &( talents.arcane_subtlety      ) }, {  1, &( talents.improved_fire_blast ) }, {  1, &( talents.frostbite                ) } },
     { {  2, &( talents.arcane_focus         ) }, {  2, &( talents.incineration        ) }, {  2, &( talents.improved_frost_bolt      ) } },
     { {  3, NULL                              }, {  3, &( talents.improved_fire_ball  ) }, {  3, &( talents.ice_floes                ) } },
-    { {  4, NULL                              }, {  4, &( talents.ignite              ) }, {  4, &( talents.ice_shards               ) } },
+    { {  4, &( talents.arcane_fortitude     ) }, {  4, &( talents.ignite              ) }, {  4, &( talents.ice_shards               ) } },
     { {  5, NULL                              }, {  5, NULL                             }, {  5, NULL                                  } },
     { {  6, &( talents.arcane_concentration ) }, {  6, &( talents.world_in_flames     ) }, {  6, &( talents.precision                ) } },
     { {  7, NULL                              }, {  7, NULL                             }, {  7, NULL                                  } },
@@ -3538,6 +3469,7 @@ std::vector<option_t>& mage_t::get_options()
       { "arcane_empowerment",        OPT_INT,   &( talents.arcane_empowerment        ) },
       { "arcane_flows",              OPT_INT,   &( talents.arcane_flows              ) },
       { "arcane_focus",              OPT_INT,   &( talents.arcane_focus              ) },
+      { "arcane_fortitude",          OPT_INT,   &( talents.arcane_fortitude          ) },
       { "arcane_impact",             OPT_INT,   &( talents.arcane_impact             ) },
       { "arcane_instability",        OPT_INT,   &( talents.arcane_instability        ) },
       { "arcane_meditation",         OPT_INT,   &( talents.arcane_meditation         ) },
@@ -3651,13 +3583,42 @@ int mage_t::decode_set( item_t& item )
 
 // player_t::create_mage  ===================================================
 
-player_t* player_t::create_mage( sim_t* sim, const std::string& name )
+player_t* player_t::create_mage( sim_t* sim, const std::string& name, int race_type )
 {
-  mage_t* p = new mage_t( sim, name );
+  mage_t* p = new mage_t( sim, name, race_type );
 
   new    mirror_image_pet_t( sim, p );
   new water_elemental_pet_t( sim, p );
 
   return p;
+}
+
+// player_t::mage_init ======================================================
+
+void player_t::mage_init( sim_t* sim )
+{
+  for ( player_t* p = sim -> player_list; p; p = p -> next )
+  {
+    p -> buffs.arcane_brilliance = new buff_t( p, "arcane_brilliance", 1 );
+  }
+
+  target_t* t = sim -> target;
+  t -> debuffs.improved_scorch = new debuff_t( sim, "improved_scorch", 5, ( sim -> overrides.improved_scorch ? 0.0 : 30.0 ) );
+  t -> debuffs.winters_chill   = new debuff_t( sim, "winters_chill",   5, ( sim -> overrides.winters_chill   ? 0.0 : 15.0 ) );
+}
+
+// player_t::mage_combat_begin ==============================================
+
+void player_t::mage_combat_begin( sim_t* sim )
+{
+  for ( player_t* p = sim -> player_list; p; p = p -> next )
+  {
+    if ( p -> type == PLAYER_GUARDIAN ) continue;
+    if ( sim -> overrides.arcane_brilliance ) p -> buffs.arcane_brilliance -> trigger( 1, 60.0 );
+  }
+
+  target_t* t = sim -> target;
+  if ( sim -> overrides.improved_scorch ) t -> debuffs.improved_scorch -> trigger( 5 );
+  if ( sim -> overrides.winters_chill   ) t -> debuffs.winters_chill   -> trigger( 5 );
 }
 

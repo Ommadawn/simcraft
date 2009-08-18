@@ -146,6 +146,12 @@ enum dmg_type { DMG_DIRECT=0, DMG_OVER_TIME=1 };
 
 enum attribute_type { ATTRIBUTE_NONE=0, ATTR_STRENGTH, ATTR_AGILITY, ATTR_STAMINA, ATTR_INTELLECT, ATTR_SPIRIT, ATTRIBUTE_MAX };
 
+enum base_stat_type { BASE_STAT_STRENGTH=0, BASE_STAT_AGILITY, BASE_STAT_STAMINA, BASE_STAT_INTELLECT, BASE_STAT_SPIRIT, 
+                      BASE_STAT_HEALTH, BASE_STAT_MANA,
+                      BASE_STAT_MELEE_CRIT_PER_AGI, BASE_STAT_SPELL_CRIT_PER_INT, 
+                      BASE_STAT_DODGE_PER_AGI,
+                      BASE_STAT_MELEE_CRIT, BASE_STAT_SPELL_CRIT, BASE_STAT_MAX };
+
 enum resource_type
 {
   RESOURCE_NONE=0,
@@ -537,6 +543,7 @@ struct util_t
 
   static const char* class_id_string( int type );
   static int translate_class_id( int cid );
+  static int translate_race_id( int rid );
   static bool socket_gem_match( int socket, int gem );
 
   static int string_split( std::vector<std::string>& results, const std::string& str, const char* delim, bool allow_quotes = false );
@@ -552,6 +559,8 @@ struct util_t
   static std::string& ascii_binary_to_utf8_hex( std::string& name );
   static std::string& utf8_hex_to_ascii( std::string& name );
   static std::string& format_name( std::string& name );
+
+  static void add_base_stats( base_stats_t& result, base_stats_t& a, base_stats_t b );
 };
 
 // Event =====================================================================
@@ -678,11 +687,17 @@ struct buff_t
   buff_t* next;
 
   buff_t() : sim( 0 ) {}
-  buff_t( sim_t*, player_t*,
-          const std::string& name,
+  virtual ~buff_t() { };
+
+  // Raid Aura
+  buff_t( sim_t*, const std::string& name,
           int max_stack=1, double duration=0, double cooldown=0,
           double chance=1.0, bool quiet=false, int rng_type=RNG_CYCLIC, int aura_id=0 );
-  virtual ~buff_t() { };
+
+  // Player Buff
+  buff_t( player_t*, const std::string& name,
+          int max_stack=1, double duration=0, double cooldown=0,
+          double chance=1.0, bool quiet=false, int rng_type=RNG_CYCLIC, int aura_id=0 );
 
   // Use check() inside of ready() methods to prevent skewing of "benefit" calculations.
   // Use up() where the presence of the buff affects the action mechanics.
@@ -703,6 +718,8 @@ struct buff_t
   virtual void   override ( int stacks=1, double value=1.0 );
   virtual void   expire();
   virtual void   reset();
+  virtual void   aura_gain();
+  virtual void   aura_loss();
   virtual void   merge( buff_t* other_buff );
   virtual void   analyze();
   virtual const char* name() { return name_str.c_str(); }
@@ -715,8 +732,7 @@ struct stat_buff_t : public buff_t
 {
   int stat;
   double amount;
-  stat_buff_t( sim_t*, player_t*,
-	       const std::string& name,
+  stat_buff_t( player_t*, const std::string& name,
 	       int stat, double amount,
 	       int max_stack=1, double duration=0, double cooldown=0,
 	       double chance=1.0, bool quiet=false, int rng_type=RNG_CYCLIC, int aura_id=0 );
@@ -726,6 +742,17 @@ struct stat_buff_t : public buff_t
   virtual void decrement( int stacks=1, double value=-1.0 );
   virtual void expire();
 };
+
+struct debuff_t : public buff_t
+{
+  debuff_t( sim_t*, const std::string& name,
+	    int max_stack=1, double duration=0, double cooldown=0,
+	    double chance=1.0, bool quiet=false, int rng_type=RNG_CYCLIC, int aura_id=0 );
+  virtual void aura_gain();
+  virtual void aura_loss();
+};
+
+typedef struct buff_t aura_t;
 
 // Expressions =================================================================
 
@@ -808,7 +835,7 @@ struct sim_t
   int         seed, id, iterations, current_iteration;
   int         infinite_resource[ RESOURCE_MAX ];
   int         armor_update_interval;
-  int         optimal_raid, log, debug, save_profiles;
+  int         optimal_raid, spell_crit_suppression, log, debug, save_profiles;
   std::string default_region_str, default_server_str;
   alias_t     alias;
 
@@ -893,8 +920,9 @@ struct sim_t
   struct auras_t
   {
     // New Buffs
-    buff_t* moonkin;
-    buff_t* improved_moonkin;
+    aura_t* moonkin;
+    aura_t* improved_moonkin;
+    aura_t* rampage;
     // Old Buffs
     int old_buffs;
     int celerity;
@@ -988,6 +1016,7 @@ struct sim_t
   rng_t*    get_rng( const std::string& name, int type=RNG_DEFAULT );
   player_t* find_player( const std::string& name );
   void      use_optimal_buffs_and_debuffs( int value );
+  void      use_spell_crit_suppression( int value );
   void      aura_gain( const char* name, int aura_id=0 );
   void      aura_loss( const char* name, int aura_id=0 );
 };
@@ -1033,6 +1062,7 @@ struct rating_t
   rating_t() { memset( this, 0x00, sizeof( rating_t ) ); }
   void init( int level );
   static double interpolate( int level, double val_60, double val_70, double val_80 );
+  static double get_attribute_base( int level, int class_type, int race, int stat_type );
 };
 
 // Weapon ====================================================================
@@ -1316,14 +1346,15 @@ struct player_t
   struct buffs_t
   {
     // New Buffs
+    buff_t* arcane_brilliance;
     buff_t* elemental_oath;
     buff_t* innervate;
+    buff_t* mark_of_the_wild;
     buff_t* mongoose_mh;
     buff_t* mongoose_oh;
     // Old Buffs
     int       old_buffs;
     int       abominations_might;
-    double    arcane_brilliance;
     int       battle_shout;
     int       blessing_of_kings;
     int       blessing_of_might;
@@ -1338,10 +1369,10 @@ struct player_t
     player_t* focus_magic;
     int       focus_magic_feedback;
     double    fortitude;
+    double    heroic_presence;
     int       hysteria;
     double    mana_cost_reduction;
     double    mana_spring;
-    double    mark_of_the_wild;
     int       power_infusion;
     int       rampage;
     int       replenishment;
@@ -1436,6 +1467,7 @@ struct player_t
     gain_t* restore_mana;
     gain_t* spellsurge;
     gain_t* spirit_intellect_regen;
+    gain_t* vampiric_embrace;
     gain_t* vampiric_touch;
     gain_t* water_elemental;
     gain_t *tier4_2pc,  *tier4_4pc;
@@ -1452,7 +1484,7 @@ struct player_t
 
   struct procs_t
   {
-    proc_t* honor_among_thieves_donor;
+    proc_t* hat_donor;
     proc_t *tier4_2pc,  *tier4_4pc;
     proc_t *tier5_2pc,  *tier5_4pc;
     proc_t *tier6_2pc,  *tier6_4pc;
@@ -1485,7 +1517,7 @@ struct player_t
   rngs_t rngs;
 
 
-  player_t( sim_t* sim, int type, const std::string& name );
+  player_t( sim_t* sim, int type, const std::string& name, int race_type = RACE_NONE );
 
   virtual ~player_t();
 
@@ -1525,17 +1557,17 @@ struct player_t
 
   virtual double composite_attack_power() SC_CONST;
   virtual double composite_attack_crit() SC_CONST;
-  virtual double composite_attack_expertise() SC_CONST   { return attack_expertise;   }
-  virtual double composite_attack_hit() SC_CONST         { return attack_hit;         }
-  virtual double composite_attack_penetration() SC_CONST { return attack_penetration; }
+  virtual double composite_attack_expertise() SC_CONST   { return attack_expertise;                   }
+  virtual double composite_attack_hit() SC_CONST         { return attack_hit + buffs.heroic_presence; }
+  virtual double composite_attack_penetration() SC_CONST { return attack_penetration;                 }
 
   virtual double composite_armor() SC_CONST;
   virtual double composite_armor_snapshot() SC_CONST    { return armor_snapshot; }
 
   virtual double composite_spell_power( int school ) SC_CONST;
   virtual double composite_spell_crit() SC_CONST;
-  virtual double composite_spell_hit() SC_CONST         { return spell_hit;         }
-  virtual double composite_spell_penetration() SC_CONST { return spell_penetration; }
+  virtual double composite_spell_hit() SC_CONST         { return spell_hit + buffs.heroic_presence; }
+  virtual double composite_spell_penetration() SC_CONST { return spell_penetration;                 }
 
   virtual double composite_attack_power_multiplier() SC_CONST;
   virtual double composite_spell_power_multiplier() SC_CONST { return spell_power_multiplier; }
@@ -1599,20 +1631,22 @@ struct player_t
   virtual void armory( xml_node_t* sheet_xml, xml_node_t* talents_xml ) {}
   virtual int  decode_set( item_t& item ) { return SET_NONE; }
 
+  virtual void recalculate_haste();
+
   // Class-Specific Methods
 
-  static player_t* create( sim_t* sim, const std::string& type, const std::string& name );
+  static player_t* create( sim_t* sim, const std::string& type, const std::string& name, int race_type = RACE_NONE );
 
-  static player_t * create_death_knight( sim_t* sim, const std::string& name );
-  static player_t * create_druid       ( sim_t* sim, const std::string& name );
-  static player_t * create_hunter      ( sim_t* sim, const std::string& name );
-  static player_t * create_mage        ( sim_t* sim, const std::string& name );
-  static player_t * create_paladin     ( sim_t* sim, const std::string& name );
-  static player_t * create_priest      ( sim_t* sim, const std::string& name );
-  static player_t * create_rogue       ( sim_t* sim, const std::string& name );
-  static player_t * create_shaman      ( sim_t* sim, const std::string& name );
-  static player_t * create_warlock     ( sim_t* sim, const std::string& name );
-  static player_t * create_warrior     ( sim_t* sim, const std::string& name );
+  static player_t * create_death_knight( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_druid       ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_hunter      ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_mage        ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_paladin     ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_priest      ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_rogue       ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_shaman      ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_warlock     ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
+  static player_t * create_warrior     ( sim_t* sim, const std::string& name, int race_type = RACE_NONE );
 
   // Raid-wide Death Knight buff maintenance
   static void death_knight_init        ( sim_t* sim ) {}
@@ -1630,8 +1664,8 @@ struct player_t
   static void hunter_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Mage buff maintenance
-  static void mage_init        ( sim_t* sim ) {}
-  static void mage_combat_begin( sim_t* sim ) {}
+  static void mage_init        ( sim_t* sim );
+  static void mage_combat_begin( sim_t* sim );
   static void mage_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Paladin buff maintenance
@@ -1644,7 +1678,7 @@ struct player_t
   static void priest_combat_begin( sim_t* sim ) {}
   static void priest_combat_end  ( sim_t* sim ) {}
 
-  // Raid-wide Rogeu buff maintenance
+  // Raid-wide Rogue buff maintenance
   static void rogue_init        ( sim_t* sim ) {}
   static void rogue_combat_begin( sim_t* sim ) {}
   static void rogue_combat_end  ( sim_t* sim ) {}
@@ -1655,13 +1689,13 @@ struct player_t
   static void shaman_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Warlock buff maintenance
-  static void warlock_init        ( sim_t* sim ) {}
-  static void warlock_combat_begin( sim_t* sim ) {}
+  static void warlock_init        ( sim_t* sim );
+  static void warlock_combat_begin( sim_t* sim );
   static void warlock_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Warrior buff maintenance
-  static void warrior_init        ( sim_t* sim ) {}
-  static void warrior_combat_begin( sim_t* sim ) {}
+  static void warrior_init        ( sim_t* sim );
+  static void warrior_combat_begin( sim_t* sim );
   static void warrior_combat_end  ( sim_t* sim ) {}
 
   bool is_pet() { return type == PLAYER_PET || type == PLAYER_GUARDIAN; }
@@ -1684,7 +1718,6 @@ struct player_t
   action_t* find_action( const std::string& );
   void      share_cooldown( const std::string& name, double ready );
   void      share_duration( const std::string& name, double ready );
-  void      recalculate_haste();
   double    mana_regen_per_second();
   bool      dual_wield() SC_CONST { return main_hand_weapon.type != WEAPON_NONE && off_hand_weapon.type != WEAPON_NONE; }
   void      aura_gain( const char* name, int aura_id=0 );
@@ -1760,14 +1793,18 @@ struct target_t
   struct debuffs_t
   {
     // New Buffs
-    buff_t* earth_and_moon;
-    buff_t* faerie_fire;
-    buff_t* improved_faerie_fire;
-    buff_t* mangle;
+    debuff_t* blood_frenzy;
+    debuff_t* earth_and_moon;
+    debuff_t* faerie_fire;
+    debuff_t* improved_faerie_fire;
+    debuff_t* improved_scorch;
+    debuff_t* improved_shadow_bolt;
+    debuff_t* mangle;
+    debuff_t* trauma;
+    debuff_t* winters_chill;
     // Old Buffs
     int    old_buffs;
     int    bleeding;
-    int    blood_frenzy;
     int    crypt_fever;
     int    curse_of_elements;
     double expose_armor;
@@ -1775,8 +1812,6 @@ struct target_t
     double hemorrhage;
     int    hemorrhage_charges;
     double hunters_mark;
-    int    improved_scorch;
-    int    improved_shadow_bolt;
     int    judgement_of_wisdom;
     int    master_poisoner;
     int    misery;
@@ -1786,10 +1821,8 @@ struct target_t
     int    slow;
     int    snare;
     double sunder_armor;
-    int    trauma;
     int    thunder_clap;
     int    totem_of_wrath;
-    int    winters_chill;
     int    winters_grasp;
     debuffs_t() { memset( (void*) this, 0x0, sizeof( debuffs_t ) ); }
     void reset()
@@ -1808,13 +1841,10 @@ struct target_t
     event_t* frozen;
     event_t* hemorrhage;
     event_t* hunters_mark;
-    event_t* improved_scorch;
-    event_t* improved_shadow_bolt;
     event_t* misery;
     event_t* nature_vulnerability;
     event_t* shadow_vulnerability;
     event_t* shadow_weaving;
-    event_t* winters_chill;
     event_t* winters_grasp;
     void reset() { memset( ( void* ) this, 0x00, sizeof( expirations_t ) ); }
     expirations_t() { reset(); }
@@ -1824,15 +1854,12 @@ struct target_t
   struct uptimes_t
   {
     uptime_t* blood_frenzy;
-    uptime_t* improved_scorch;
-    uptime_t* improved_shadow_bolt;
     uptime_t* invulnerable;
     uptime_t* master_poisoner;
     uptime_t* savage_combat;
     uptime_t* trauma;
     uptime_t* totem_of_wrath;
     uptime_t* vulnerable;
-    uptime_t* winters_chill;
     uptime_t* winters_grasp;
     void reset() { memset( ( void* ) this, 0x00, sizeof( uptimes_t ) ); }
     uptimes_t() { reset(); }
@@ -1851,6 +1878,8 @@ struct target_t
   double time_to_die() SC_CONST;
   double health_percentage() SC_CONST;
   double base_armor() SC_CONST;
+  void aura_gain( const char* name, int aura_id=0 );
+  void aura_loss( const char* name, int aura_id=0 );
   uptime_t* get_uptime( const std::string& name );
   int get_options( std::vector<option_t>& );
   const char* name() SC_CONST { return name_str.c_str(); }
@@ -2079,6 +2108,7 @@ struct spell_t : public action_t
   virtual void   player_buff();
   virtual void   target_debuff( int dmg_type );
   virtual double level_based_miss_chance( int player, int target ) SC_CONST;
+  virtual double crit_chance( int player, int target ) SC_CONST;
   virtual void   calculate_result();
   virtual void   execute();
 };
@@ -2197,6 +2227,10 @@ struct unique_gear_t
   static bool get_equip_encoding( std::string& encoding,
                                   const std::string& item_name,
                                   const std::string& item_id=std::string() );
+
+  static bool get_hidden_encoding( std::string&       encoding,
+                                   const std::string& item_name,
+                                   const std::string& item_id=std::string() );
 
   static bool get_use_encoding  ( std::string& encoding,
                                   const std::string& item_name,
@@ -2454,8 +2488,8 @@ struct mmo_champion_t
 
 struct rawr_t
 {
-  static player_t* load_player( sim_t*, FILE* );
-  static player_t* load_player( sim_t*, const std::string& character_xml );
+  static player_t* load_player( sim_t*, const std::string& character_filename );
+  static player_t* load_player( sim_t*, const std::string& character_filename, const std::string& character_xml );
 };
 
 // HTTP Download  ============================================================

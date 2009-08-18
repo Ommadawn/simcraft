@@ -121,13 +121,10 @@ void spell_t::target_debuff( int dmg_type )
 
   target_hit += std::max( t -> debuffs.improved_faerie_fire -> value(), (double) t -> debuffs.misery ) * 0.01;
 
-  int crit_debuff = std::max( t -> debuffs.winters_chill, t -> debuffs.improved_scorch );
-  crit_debuff = std::max( crit_debuff, t -> debuffs.improved_shadow_bolt );
+  int crit_debuff = std::max( std::max( t -> debuffs.winters_chill -> stack(), 
+					t -> debuffs.improved_scorch -> stack() ),
+			                t -> debuffs.improved_shadow_bolt -> stack() * 5 );
   target_crit += crit_debuff * 0.01;
-
-  t -> uptimes.winters_chill        -> update( t -> debuffs.winters_chill        != 0 );
-  t -> uptimes.improved_scorch      -> update( t -> debuffs.improved_scorch      != 0 );
-  t -> uptimes.improved_shadow_bolt -> update( t -> debuffs.improved_shadow_bolt != 0 );
 
   if ( sim -> debug )
     log_t::output( sim, "spell_t::target_debuff: %s multiplier=%.2f hit=%.2f crit=%.2f",
@@ -157,11 +154,30 @@ double spell_t::level_based_miss_chance( int player,
   return miss;
 }
 
+// spell_t::crit_chance ====================================================
+// experimental implementation of 3% crit chance reduction against +3 level
+// targets; should only be used with spell_crit_suppression=1
+
+double spell_t::crit_chance( int player_level,
+			     int target_level ) SC_CONST
+{
+  int delta_level = target_level - player_level;
+  double chance = total_crit();
+	
+  if ( ! player -> is_pet() && delta_level > 2 && sim -> spell_crit_suppression )
+  {
+    chance -= 0.03;
+  }
+	
+  return chance;
+}
+
 // spell_t::caclulate_result ================================================
 
 void spell_t::calculate_result()
 {
   direct_dmg = 0;
+  double crit = 0;
 
   result = RESULT_NONE;
 
@@ -193,7 +209,9 @@ void spell_t::calculate_result()
 
     if ( may_crit )
     {
-      if ( rng[ RESULT_CRIT ] -> roll( total_crit() ) )
+      // Experimental check for spell crit suppression
+      crit = crit_chance( player -> level, sim -> target -> level );
+      if ( rng[ RESULT_CRIT ] -> roll( crit ) )
       {
         result = RESULT_CRIT;
       }

@@ -302,6 +302,12 @@ void action_t::player_buff()
     player_spell_power_multiplier = p -> composite_spell_power_multiplier();
   }
 
+  if ( ( p -> race == RACE_TROLL ) && ( sim -> target -> race == RACE_BEAST ) )
+  {
+    player_multiplier             *= 1.05;
+  }
+ 
+
   if ( sim -> debug )
     log_t::output( sim, "action_t::player_buff: %s hit=%.2f crit=%.2f penetration=%.0f spell_power=%.2f attack_power=%.2f ",
                    name(), player_hit, player_crit, player_penetration, player_spell_power, player_attack_power );
@@ -327,12 +333,11 @@ void action_t::target_debuff( int dmg_type )
   if ( school == SCHOOL_PHYSICAL ||
        school == SCHOOL_BLEED    )
   {
-    if ( t -> debuffs.blood_frenzy  ||
+    if ( t -> debuffs.blood_frenzy -> up() ||
          t -> debuffs.savage_combat )
     {
       target_multiplier *= 1.04;
     }
-    t -> uptimes.blood_frenzy  -> update( t -> debuffs.blood_frenzy  != 0 );
     t -> uptimes.savage_combat -> update( t -> debuffs.savage_combat != 0 );
   }
   else
@@ -343,7 +348,7 @@ void action_t::target_debuff( int dmg_type )
 
   if ( school == SCHOOL_BLEED )
   {
-    if ( t -> debuffs.mangle -> up() || t -> debuffs.trauma )
+    if ( t -> debuffs.mangle -> up() || t -> debuffs.trauma -> up() )
     {
       target_multiplier *= 1.30;
     }
@@ -712,6 +717,7 @@ void action_t::tick()
     if ( rng[ RESULT_CRIT ] -> roll( total_crit() ) )
     {
       result = RESULT_CRIT;
+      action_callback_t::trigger( player -> spell_result_callbacks[ RESULT_CRIT ], this );
     }
   }
 

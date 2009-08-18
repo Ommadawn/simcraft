@@ -16,10 +16,12 @@ struct enchant_data_t
 
 static enchant_data_t enchant_db[] =
 {
+  { "3878",  "Mind Amplification Dish",                                   "45Sta"                          },
   { "3873",  "+50 Spell Power and +30 Stamina",                           "50SP_30Sta"                     },
   { "3872",  "+50 Spell Power and +20 Spirit",                            "50SP_20Spi"                     },
   { "3870",  "Blood Draining",                                            ""                               },
   { "3869",  "Blade Ward",                                                ""                               },
+  { "3860",  "+885 Armor",                                                "885Armor"                       },
   { "3859",  "Springy Arachnoweave",                                      "27SP"                           },
   { "3855",  "+69 Spell Power",                                           "69SP"                           },
   { "3854",  "+81 Spell Power",                                           "81SP"                           },
@@ -34,12 +36,12 @@ static enchant_data_t enchant_db[] =
   { "3844",  "+45 Spirit",                                                "45Spi"                          },
   { "3843",  "Scope (+15 Damage)",                                        ""                               },
   { "3842",  "+37 Stamina and +20 Defense",                               "37Sta"                          },
-  { "3840",  "+19 Spell Power",                                           "19SP"                           },
-  { "3839",  "+32 Attack Power",                                          "32AP"                           },
-  { "3838",  "+61 Spell Power and +15 Crit Rating",                       "61SP_15Crit"                    },
-  { "3837",  "+52 Dodge Rating and +15 Defense Rating",                   ""                               },
-  { "3836",  "+61 Spell Power and +6 Mana/5 seconds",                     "61SP_6MP5"                      },
-  { "3835",  "+104 Attack Power and +15 Crit Rating",                     "104AP_15Crit"                   },
+  { "3840",  "+23 Spell Power",                                           "23SP"                           },
+  { "3839",  "+40 Attack Power",                                          "40AP"                           },
+  { "3838",  "+70 Spell Power and +15 Crit Rating",                       "70SP_15Crit"                    },
+  { "3837",  "+60 Dodge Rating and +15 Defense Rating",                   ""                               },
+  { "3836",  "+70 Spell Power and +6 Mana/5 seconds",                     "70SP_6MP5"                      },
+  { "3835",  "+120 Attack Power and +15 Crit Rating",                     "120AP_15Crit"                   },
   { "3834",  "+63 Spell Power",                                           "63SP"                           },
   { "3833",  "+65 Attack Power",                                          "65AP"                           },
   { "3832",  "+10 All Stats",                                             "10Str_10Agi_10Sta_10Int_10Spi"  },
@@ -72,19 +74,19 @@ static enchant_data_t enchant_db[] =
   { "3795",  "+50 Attack Power and +20 Resilience Rating",                "50AP"                           },
   { "3794",  "+23 Spell Power and +15 Resilience Rating",                 "23SP"                           },
   { "3793",  "+40 Attack Power and +15 Resilience Rating",                "45AP"                           },
-  { "3791",  "+24 Stamina",                                               "24Sta"                          },
+  { "3791",  "+30 Stamina",                                               "30Sta"                          },
   { "3790",  "+63 Spell Power",                                           "63SP"                           },
   { "3789",  "Berserking",                                                "berserking"                     },
   { "3788",  "Accuracy",                                                  "25Hit_25Crit"                   },
   { "3760",  "+60 Frost Resistance",                                      ""                               },
-  { "3758",  "+67 Spell Power",                                           "67SP"                           },
-  { "3757",  "+90 Stamina",                                               "90Sta"                          },
-  { "3756",  "+114 Attack Power",                                         "114AP"                          },
+  { "3758",  "+76 Spell Power",                                           "76SP"                           },
+  { "3757",  "+102 Stamina",                                              "102Sta"                         },
+  { "3756",  "+130 Attack Power",                                         "130AP"                          },
   { "3754",  "+24 Attack Power/+10 Stamina/+10 Hit Rating",               "24AP_10Sta_10Hit"               },
   { "3748",  "Titanium Spike (45-67)",                                    ""                               },
   { "3731",  "Titanium Weapon Chain",                                     ""                               },
   { "3730",  "Swordguard Embroidery",                                     ""                               },
-  { "3728",  "Darkglow Embroidery",                                       ""                               },
+  { "3728",  "Darkglow Embroidery",                                       "darkglow_embroidery"            },
   { "3722",  "Lightweave Embroidery",                                     "lightweave_embroidery"          },
   { "3721",  "+50 Spell Power and +30 Stamina",                           "50SP_30Sta"                     },
   { "3720",  "+35 Spell Power and +20 Stamina",                           "35SP_20Sta"                     },
@@ -592,21 +594,21 @@ void enchant_t::init( player_t* p )
   if ( p -> is_pet() ) return;
 
   // Need to expose the Mongoose buffs for attack_t::haste()
-  p -> buffs.mongoose_mh = new stat_buff_t( p -> sim, p, "mongoose_main_hand", STAT_AGILITY, 120, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
-  p -> buffs.mongoose_oh = new stat_buff_t( p -> sim, p, "mongoose_off_hand" , STAT_AGILITY, 120, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
+  p -> buffs.mongoose_mh = new stat_buff_t( p, "mongoose_main_hand", STAT_AGILITY, 120, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
+  p -> buffs.mongoose_oh = new stat_buff_t( p, "mongoose_off_hand" , STAT_AGILITY, 120, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
 
   std::string& mh_enchant = p -> items[ SLOT_MAIN_HAND ].encoded_enchant_str;
   std::string& oh_enchant = p -> items[ SLOT_OFF_HAND  ].encoded_enchant_str;
 
   if ( mh_enchant == "berserking" )
   {
-    buff_t* buff = new stat_buff_t( p -> sim, p, "berserking_mh", STAT_ATTACK_POWER, 400, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
+    buff_t* buff = new stat_buff_t( p, "berserking_mh", STAT_ATTACK_POWER, 400, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
 
     p -> register_attack_result_callback( RESULT_HIT_MASK, new berserking_callback_t( p, SLOT_MAIN_HAND, buff ) );
   }
   if ( oh_enchant == "berserking" )
   {
-    buff_t* buff = new stat_buff_t( p -> sim, p, "berserking_oh", STAT_ATTACK_POWER, 400, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
+    buff_t* buff = new stat_buff_t( p, "berserking_oh", STAT_ATTACK_POWER, 400, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
 
     p -> register_attack_result_callback( RESULT_HIT_MASK, new berserking_callback_t( p, SLOT_OFF_HAND, buff ) );
   }
@@ -614,7 +616,7 @@ void enchant_t::init( player_t* p )
   {
     // MH-OH trigger/refresh the same Executioner buff.  It does not stack.
 
-    buff_t* buff = new stat_buff_t( p -> sim, p, "executioner", STAT_ARMOR_PENETRATION_RATING, 120, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
+    buff_t* buff = new stat_buff_t( p, "executioner", STAT_ARMOR_PENETRATION_RATING, 120, 1, 15, 0, 0, false, RNG_DISTRIBUTED );
 
     if ( mh_enchant == "executioner" )
     {

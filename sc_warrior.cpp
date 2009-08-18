@@ -42,17 +42,6 @@ struct warrior_t : public player_t
   };
   _cooldowns_t _cooldowns;
 
-  // Expirations
-  struct _expirations_t
-  {
-    event_t* blood_frenzy;
-    event_t* trauma;
-
-    void reset() { memset( ( void* ) this, 0x00, sizeof( _expirations_t ) ); }
-    _expirations_t() { reset(); }
-  };
-  _expirations_t _expirations;
-
   // Gains
   gain_t* gains_anger_management;
   gain_t* gains_avoided_attacks;
@@ -184,7 +173,7 @@ struct warrior_t : public player_t
   };
   tiers_t tiers;
 
-  warrior_t( sim_t* sim, const std::string& name ) : player_t( sim, WARRIOR, name )
+  warrior_t( sim_t* sim, const std::string& name, int race_type = RACE_NONE ) : player_t( sim, WARRIOR, name, race_type )
   {
     // Active
     active_deep_wounds       = 0;
@@ -200,6 +189,7 @@ struct warrior_t : public player_t
 
   // Character Definition
   virtual void      init_glyphs();
+  virtual void      init_race();
   virtual void      init_base();
   virtual void      init_buffs();
   virtual void      init_items();
@@ -298,41 +288,21 @@ double warrior_attack_t::dodge_chance( int delta_level ) SC_CONST
 static void trigger_blood_frenzy( action_t* a )
 {
   warrior_t* p = a -> player -> cast_warrior();
-  if ( ! p -> talents.blood_frenzy )
+  if ( p -> talents.blood_frenzy == 0 )
     return;
 
-  struct blood_frenzy_expiration_t : public event_t
+  target_t* t = a -> sim -> target;
+
+  // Don't alter the duration if it is set to 0 (override/optimal_raid)
+  if ( t -> debuffs.blood_frenzy -> duration > 0 )
+    t -> debuffs.blood_frenzy -> duration = a -> num_ticks * a -> base_tick_time;
+
+  double value    = p -> talents.blood_frenzy * 2;
+
+  if( value >= t -> debuffs.blood_frenzy -> current_value )
   {
-    blood_frenzy_expiration_t( sim_t* sim, warrior_t* player, double duration ) : event_t( sim, player, 0 )
-    {
-      name = "Blood Frenzy Expiration";
-      sim -> target -> debuffs.blood_frenzy++;
-      sim -> add_event( this, duration );
-    }
-    virtual void execute()
-    {
-      warrior_t* p = player -> cast_warrior();
-      sim -> target -> debuffs.blood_frenzy--;
-      p -> _expirations.blood_frenzy = 0;
-    }
-  };
-
-  event_t*& e = p -> _expirations.blood_frenzy;
-
-  double duration = a -> num_ticks * a -> base_tick_time;
-
-  if ( e )
-  {
-    // The new bleeds duration lasts longer than the current one.
-    // Different duration: Deep Wounds vs Rend (+glyph)
-    if ( duration > ( e -> occurs() - a -> sim -> current_time ) )
-      e -> reschedule( duration );
+    t -> debuffs.blood_frenzy -> trigger( 1, value );
   }
-  else
-  {
-    e = new ( a -> sim ) blood_frenzy_expiration_t( a -> sim, p, duration );
-  }
-
 }
 
 // trigger_deep_wounds ======================================================
@@ -361,7 +331,7 @@ static void trigger_deep_wounds( action_t* a )
     virtual double total_multiplier() SC_CONST
     {
       target_t* t = sim -> target;
-      return ( t -> debuffs.mangle -> up() || t -> debuffs.trauma ) ? 1.30 : 1.0;
+      return ( t -> debuffs.mangle -> up() || t -> debuffs.trauma -> up() ) ? 1.30 : 1.0;
     }
     virtual void execute()
     {
@@ -452,48 +422,8 @@ static void trigger_rampage( attack_t* a )
 
   if ( w -> talents.rampage == 0 )
     return;
-
-  struct rampage_expiration_t : public event_t
-  {
-    rampage_expiration_t( sim_t* sim ) : event_t( sim )
-    {
-      name = "Rampage Reflexes Expiration";
-      sim -> add_event( this, 10.0 );
-    }
-    virtual void execute()
-    {
-      for ( player_t* p = sim -> player_list; p; p = p -> next )
-      {
-        if ( p -> buffs.rampage )
-        {
-          p -> aura_loss( "Rampage Reflexes" );
-          p -> buffs.rampage = 0;
-        }
-      }
-      sim -> expirations.rampage = NULL;
-    }
-  };
-
-  for ( player_t* p = a -> sim -> player_list; p; p = p -> next )
-  {
-    if ( p -> sleeping ) continue;
-    if ( p -> buffs.rampage == 0 )
-    {
-      p -> aura_gain( "Rampage Reflexes" );
-      p -> buffs.rampage = 1;
-    }
-  }
-
-  event_t*& e = a -> sim -> expirations.rampage;
-
-  if ( e )
-  {
-    e -> reschedule( 10.0 );
-  }
-  else
-  {
-    e = new ( a -> sim ) rampage_expiration_t( a -> sim );
-  }
+  
+  w -> sim -> auras.rampage -> trigger();
 }
 
 // trigger_unbridled_wrath ==================================================
@@ -527,32 +457,14 @@ static void trigger_trauma( action_t* a )
 
   if ( a -> result != RESULT_CRIT )
     return;
+  
+  target_t* t = a -> sim -> target;
 
-  struct trauma_expiration_t : public event_t
-  {
-    trauma_expiration_t( sim_t* sim, warrior_t* p ) : event_t( sim, p )
-    {
-      name = "Trauma Expiration";
-      sim -> target -> debuffs.trauma++;
-      sim -> add_event( this, 15.0 );
-    }
-    virtual void execute()
-    {
-      warrior_t* p = player -> cast_warrior();
-      sim -> target -> debuffs.trauma--;
-      p -> _expirations.trauma = 0;
-    }
-  };
+  double value = p -> talents.trauma * 15;
 
-  event_t*& e = p -> _expirations.trauma;
-
-  if ( e )
+  if( value >= t -> debuffs.trauma -> current_value )
   {
-    e -> reschedule( 15.0 );
-  }
-  else
-  {
-    e = new ( a -> sim ) trauma_expiration_t( a -> sim, p );
+    t -> debuffs.trauma -> trigger( 1, value );
   }
 }
 
@@ -634,8 +546,8 @@ void warrior_attack_t::execute()
     // Critproccgalore
     if( result == RESULT_CRIT )
     {
-      trigger_deep_wounds( this );
       trigger_rampage( this );
+      trigger_deep_wounds( this );
       trigger_trauma( this );
       p -> buffs_wrecking_crew -> trigger(1, p -> talents.wrecking_crew * 0.02 );
       p -> buffs_flurry -> trigger( 3 );
@@ -1641,7 +1553,7 @@ struct rend_t : public warrior_attack_t
   {
     base_td = base_td_init + calculate_weapon_damage() / 5.0;
     warrior_attack_t::execute();
-    trigger_blood_frenzy( this );
+    if ( result_is_hit() ) trigger_blood_frenzy( this );
   }
 };
 
@@ -2216,28 +2128,56 @@ void warrior_t::init_glyphs()
   }
 }
 
+// warrior_t::init_race ======================================================
+
+void warrior_t::init_race()
+{
+  race = util_t::parse_race_type( race_str );
+  switch ( race )
+  {
+  case RACE_HUMAN:
+  case RACE_DWARF:
+  case RACE_DRAENEI:
+  case RACE_NIGHT_ELF:
+  case RACE_GNOME:
+  case RACE_UNDEAD:
+  case RACE_ORC:
+  case RACE_TROLL:
+  case RACE_TAUREN:
+    break;
+  default:
+    race = RACE_NIGHT_ELF;
+    race_str = util_t::race_type_string( race );
+  }
+
+  player_t::init_race();
+}
+
 // warrior_t::init_base ========================================================
 
 void warrior_t::init_base()
 {
-  attribute_base[ ATTR_STRENGTH  ] = 179; // Tauren lvl 80
-  attribute_base[ ATTR_AGILITY   ] = 108;
-  attribute_base[ ATTR_STAMINA   ] = 161;
-  attribute_base[ ATTR_INTELLECT ] =  31;
-  attribute_base[ ATTR_SPIRIT    ] =  61;
+  attribute_base[ ATTR_STRENGTH  ] = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_STRENGTH );
+  attribute_base[ ATTR_AGILITY   ] = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_AGILITY );
+  attribute_base[ ATTR_STAMINA   ] = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_STAMINA );
+  attribute_base[ ATTR_INTELLECT ] = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_INTELLECT );
+  attribute_base[ ATTR_SPIRIT    ] = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_SPIRIT );
+  resource_base[ RESOURCE_HEALTH ] = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_HEALTH );
+  resource_base[ RESOURCE_MANA   ] = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_MANA );
+  base_spell_crit                  = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_SPELL_CRIT );
+  base_attack_crit                 = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_MELEE_CRIT );
+  initial_spell_crit_per_intellect = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_SPELL_CRIT_PER_INT );
+  initial_attack_crit_per_agility  = rating_t::get_attribute_base( level, WARRIOR, race, BASE_STAT_MELEE_CRIT_PER_AGI );
 
   resource_base[  RESOURCE_RAGE  ] = 100;
-  resource_base[ RESOURCE_HEALTH ] = 4579;
 
   initial_attack_power_per_strength = 2.0;
   initial_attack_power_per_agility  = 0.0;
 
   // FIX ME!
   base_attack_power = level * 2 +60;
-  base_attack_crit = 0.031905;
   base_attack_expertise  = 0.25 * talents.vitality * 0.02;
   base_attack_expertise += 0.25 * talents.strength_of_arms * 0.02;
-  initial_attack_crit_per_agility = rating_t::interpolate( level, 1 / 2000, 1 / 3200, 1 / 6256.61 );
 
   attribute_multiplier_initial[ ATTR_STRENGTH ]   *= 1 + talents.strength_of_arms * 0.02 + talents.vitality * 0.02;
   attribute_multiplier_initial[ ATTR_STAMINA  ]   *= 1 + talents.strength_of_arms * 0.02 + talents.vitality * 0.02;
@@ -2254,19 +2194,19 @@ void warrior_t::init_buffs()
   player_t::init_buffs();
 
   // buff_t( sim, player, name, max_stack, duration, cooldown, proc_chance, quiet )
-  buffs_bloodrage       = new buff_t( sim, this, "bloodrage",       1, 10.0 );
-  buffs_bloodsurge      = new buff_t( sim, this, "bloodsurge",      1,  5.0,   0, util_t::talent_rank( talents.bloodsurge, 3, 0.07, 0.13, 0.20 ) );
-  buffs_death_wish      = new buff_t( sim, this, "death_wish",      1, 30.0,   0, talents.death_wish );
-  buffs_flurry          = new buff_t( sim, this, "flurry",          3, 15.0,   0, talents.flurry );
-  buffs_overpower       = new buff_t( sim, this, "overpower",       1,  6.0, 1.0 );
-  buffs_recklessness    = new buff_t( sim, this, "recklessness",    3, 12.0 );
-  buffs_sudden_death    = new buff_t( sim, this, "sudden_death",    1, 10.0,   0, talents.sudden_death * 0.03 );
-  buffs_sword_and_board = new buff_t( sim, this, "sword_and_board", 1,  5.0,   0, talents.sword_and_board * 0.10 );
-  buffs_taste_for_blood = new buff_t( sim, this, "taste_for_blood", 1,  9.0, 6.0, talents.taste_for_blood / 3.0 );
-  buffs_wrecking_crew   = new buff_t( sim, this, "wrecking_crew",   1, 12.0,   0, talents.wrecking_crew );
-  buffs_tier7_4pc_dps   = new buff_t( sim, this, "tier7_4pc_dps",   1, 30.0,   0, tiers.t7_4pc_dps * 0.10 );
+  buffs_bloodrage       = new buff_t( this, "bloodrage",       1, 10.0 );
+  buffs_bloodsurge      = new buff_t( this, "bloodsurge",      1,  5.0,   0, util_t::talent_rank( talents.bloodsurge, 3, 0.07, 0.13, 0.20 ) );
+  buffs_death_wish      = new buff_t( this, "death_wish",      1, 30.0,   0, talents.death_wish );
+  buffs_flurry          = new buff_t( this, "flurry",          3, 15.0,   0, talents.flurry );
+  buffs_overpower       = new buff_t( this, "overpower",       1,  6.0, 1.0 );
+  buffs_recklessness    = new buff_t( this, "recklessness",    3, 12.0 );
+  buffs_sudden_death    = new buff_t( this, "sudden_death",    1, 10.0,   0, talents.sudden_death * 0.03 );
+  buffs_sword_and_board = new buff_t( this, "sword_and_board", 1,  5.0,   0, talents.sword_and_board * 0.10 );
+  buffs_taste_for_blood = new buff_t( this, "taste_for_blood", 1,  9.0, 6.0, talents.taste_for_blood / 3.0 );
+  buffs_wrecking_crew   = new buff_t( this, "wrecking_crew",   1, 12.0,   0, talents.wrecking_crew );
+  buffs_tier7_4pc_dps   = new buff_t( this, "tier7_4pc_dps",   1, 30.0,   0, tiers.t7_4pc_dps * 0.10 );
   
-  buffs_tier8_2pc_dps   = new stat_buff_t( sim, this, "tier8_2pc_dps", STAT_HASTE_RATING, 150, 1, 5.0, tiers.t8_2pc_dps * 0.40 );
+  buffs_tier8_2pc_dps   = new stat_buff_t( this, "tier8_2pc_dps", STAT_HASTE_RATING, 150, 1, 5.0, tiers.t8_2pc_dps * 0.40 );
 }
 
 // warrior_t::init_items =======================================================
@@ -2451,7 +2391,6 @@ void warrior_t::reset()
   active_stance            = STANCE_BATTLE;
 
   _cooldowns.reset();
-  _expirations.reset();
 }
 
 // warrior_t::interrupt ======================================================
@@ -2666,8 +2605,29 @@ int warrior_t::decode_set( item_t& item )
 
 // player_t::create_warrior ===============================================
 
-player_t* player_t::create_warrior( sim_t* sim, const std::string& name )
+player_t* player_t::create_warrior( sim_t* sim, const std::string& name, int race_type )
 {
-  return new warrior_t( sim, name );
+  return new warrior_t( sim, name, race_type );
 }
 
+// warrior_init ===================================================
+
+void player_t::warrior_init( sim_t* sim )
+{
+  sim -> auras.rampage = new aura_t( sim, "rampage", 1, ( sim -> overrides.rampage ? 0.0 : 10.0 ));
+
+  target_t* t = sim -> target;
+  t -> debuffs.blood_frenzy = new debuff_t( sim, "blood_frenzy", 1, ( sim -> overrides.blood_frenzy ? 0.0 : 15.0 ) );
+  t -> debuffs.trauma       = new debuff_t( sim, "trauma",       1, ( sim -> overrides.trauma       ? 0.0 : 15.0 ) );
+}
+
+// player_t::warrior_combat_begin ===========================================
+
+void player_t::warrior_combat_begin( sim_t* sim )
+{
+  if ( sim -> overrides.rampage ) sim -> auras.rampage -> trigger();
+
+  target_t* t = sim -> target;
+  if ( sim -> overrides.trauma       ) t -> debuffs.trauma       -> trigger();
+  if ( sim -> overrides.blood_frenzy ) t -> debuffs.blood_frenzy -> trigger();
+}

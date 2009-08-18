@@ -410,14 +410,15 @@ static bool parse_talent_url( sim_t* sim,
 
 player_t::player_t( sim_t*             s,
                     int                t,
-                    const std::string& n ) :
+                    const std::string& n,
+                    int                r ) :
     sim( s ), name_str( n ),
     region_str( s->default_region_str ), server_str( s->default_server_str ), origin_str( "unknown" ),
     next( 0 ), index( -1 ), type( t ), level( 80 ), tank( 0 ),
     party( 0 ), member( 0 ),
     skill( s->default_skill ), distance( 0 ), gcd_ready( 0 ), base_gcd( 1.5 ),
     potion_used( 0 ), stunned( 0 ), moving( 0 ), sleeping( 0 ), initialized( 0 ),
-    pet_list( 0 ), last_modified( 0 ), race( RACE_NONE ),
+    pet_list( 0 ), last_modified( 0 ), race_str( "" ), race( r ),
     // Haste
     base_haste_rating( 0 ), initial_haste_rating( 0 ), haste_rating( 0 ), spell_haste( 1.0 ), attack_haste( 1.0 ),
     // Spell Mechanics
@@ -474,6 +475,8 @@ player_t::player_t( sim_t*             s,
   *last = this;
   next = 0;
   index = ++( sim -> num_players );
+
+  race_str = util_t::race_type_string( race );
 
   if ( is_pet() ) skill = 1.0;
 
@@ -574,10 +577,10 @@ void player_t::init()
 
   init_rating();
   init_glyphs();
+  init_race();
   init_base();
   init_items();
   init_core();
-  init_race();
   init_spell();
   init_attack();
   init_defense();
@@ -589,7 +592,6 @@ void player_t::init()
   init_professions();
   init_scaling();
   init_consumables();
-  init_resources();
   init_actions();
   init_buffs();
   init_gains();
@@ -733,15 +735,7 @@ void player_t::init_core()
 
 void player_t::init_race()
 {
-  for ( int r=0; r < RACE_MAX; r++ )
-  {
-    const char* name = util_t::race_type_string( r );
-    if ( race_str == name )
-    {
-      race = r;
-      break;
-    }
-  }
+  race = util_t::parse_race_type( race_str );
 }
 
 // player_t::init_spell =====================================================
@@ -754,7 +748,7 @@ void player_t::init_spell()
 
   initial_spell_power[ SCHOOL_MAX ] = base_spell_power + stats.spell_power;
 
-  initial_spell_hit = base_spell_hit + stats.hit_rating / rating.spell_hit + ( sim -> overrides.heroic_presence ? 0.01 : 0.00 );
+  initial_spell_hit = base_spell_hit + stats.hit_rating / rating.spell_hit;
 
   initial_spell_crit = base_spell_crit + stats.crit_rating / rating.spell_crit;
 
@@ -779,7 +773,7 @@ void player_t::init_attack()
 
   initial_attack_power = base_attack_power + stats.attack_power;
 
-  initial_attack_hit = base_attack_hit + stats.hit_rating / rating.attack_hit + ( sim -> overrides.heroic_presence ? 0.01 : 0.00 );
+  initial_attack_hit = base_attack_hit + stats.hit_rating / rating.attack_hit;
 
   initial_attack_crit = base_attack_crit + stats.crit_rating / rating.attack_crit;
 
@@ -985,6 +979,7 @@ void player_t::init_gains()
   gains.restore_mana           = get_gain( "restore_mana" );
   gains.spellsurge             = get_gain( "spellsurge" );
   gains.spirit_intellect_regen = get_gain( "spirit_intellect_regen" );
+  gains.vampiric_embrace       = get_gain( "vampiric_embrace" );
   gains.vampiric_touch         = get_gain( "vampiric_touch" );
   gains.water_elemental        = get_gain( "water_elemental" );
   gains.tier4_2pc              = get_gain( "tier4_2pc" );
@@ -1007,7 +1002,7 @@ void player_t::init_gains()
 
 void player_t::init_procs()
 {
-  procs.honor_among_thieves_donor = ( is_pet() ? ( cast_pet() -> owner ) : this ) -> get_proc( "honor_among_thieves_donor", sim );
+  procs.hat_donor = get_proc( "hat_donor",   sim );
   procs.tier4_2pc = get_proc( "tier4_2pc",   sim );
   procs.tier4_4pc = get_proc( "tier4_4pc",   sim );
   procs.tier5_2pc = get_proc( "tier5_2pc",   sim );
@@ -1207,8 +1202,8 @@ double player_t::composite_attack_power() SC_CONST
 {
   double ap = attack_power;
 
-  ap += attack_power_per_strength * strength();
-  ap += attack_power_per_agility  * agility();
+  ap += floor( attack_power_per_strength * strength() );
+  ap += floor( attack_power_per_agility  * agility() );
 
   ap += std::max( buffs.blessing_of_might, buffs.battle_shout );
 
@@ -1223,7 +1218,7 @@ double player_t::composite_attack_crit() SC_CONST
 
   if ( type != PLAYER_GUARDIAN )
   {
-    if ( sim -> auras.leader_of_the_pack || buffs.rampage )
+    if ( sim -> auras.leader_of_the_pack || sim -> auras.rampage -> up() )
     {
       ac += 0.05;
     }
@@ -1240,7 +1235,7 @@ double player_t::composite_armor() SC_CONST
 
   if ( meta_gem == META_AUSTERE_EARTHSIEGE ) a *= 1.02;
 
-  a += armor_per_agility * agility();
+  a += floor( armor_per_agility * agility() );
 
   return a;
 }
@@ -1259,8 +1254,8 @@ double player_t::composite_spell_power( int school ) SC_CONST
 
   if ( school != SCHOOL_MAX ) sp += spell_power[ SCHOOL_MAX ];
 
-  sp += spell_power_per_intellect * intellect();
-  sp += spell_power_per_spirit    * spirit();
+  sp += floor( spell_power_per_intellect * intellect() );
+  sp += floor( spell_power_per_spirit    * spirit() );
 
   if ( type != PLAYER_GUARDIAN )
   {
@@ -1325,7 +1320,6 @@ double player_t::composite_attack_power_multiplier() SC_CONST
 double player_t::composite_attribute_multiplier( int attr ) SC_CONST
 {
   double m = attribute_multiplier[ attr ];
-  if ( buffs.blessing_of_kings ) m *= 1.10;
   return m;
 }
 
@@ -1334,11 +1328,18 @@ double player_t::composite_attribute_multiplier( int attr ) SC_CONST
 double player_t::strength() SC_CONST
 {
   double a = attribute[ ATTR_STRENGTH ];
+  double b = a - attribute_base[ ATTR_STRENGTH ];
+  double m = composite_attribute_multiplier( ATTR_STRENGTH );
+  double r;
 
-  a += buffs.mark_of_the_wild;
-  a += buffs.strength_of_earth;
+  b += buffs.mark_of_the_wild -> current_value;
+  b += buffs.strength_of_earth;
 
-  return a * composite_attribute_multiplier( ATTR_STRENGTH );
+  r = floor( attribute_base[ ATTR_STRENGTH ] * m ) + floor( b * m );
+
+  if ( buffs.blessing_of_kings ) r = floor ( r * 1.10 );
+
+  return r;
 }
 
 // player_t::agility() =====================================================
@@ -1346,11 +1347,18 @@ double player_t::strength() SC_CONST
 double player_t::agility() SC_CONST
 {
   double a = attribute[ ATTR_AGILITY ];
+  double b = a - attribute_base[ ATTR_AGILITY ];
+  double m = composite_attribute_multiplier( ATTR_AGILITY );
+  double r;
 
-  a += buffs.mark_of_the_wild;
-  a += buffs.strength_of_earth;
+  b += buffs.mark_of_the_wild -> current_value;
+  b += buffs.strength_of_earth;
 
-  return a * composite_attribute_multiplier( ATTR_AGILITY );
+  r = floor( attribute_base[ ATTR_AGILITY ] * m ) + floor( b * m );
+
+  if ( buffs.blessing_of_kings ) r = floor ( r * 1.10 );
+
+  return r;
 }
 
 // player_t::stamina() =====================================================
@@ -1358,11 +1366,18 @@ double player_t::agility() SC_CONST
 double player_t::stamina() SC_CONST
 {
   double a = attribute[ ATTR_STAMINA ];
+  double b = a - attribute_base[ ATTR_STAMINA ];
+  double m = composite_attribute_multiplier( ATTR_STAMINA );
+  double r;
 
-  a += buffs.mark_of_the_wild;
-  a += buffs.fortitude;
+  b += buffs.mark_of_the_wild -> current_value;
+  b += buffs.fortitude;
 
-  return a * composite_attribute_multiplier( ATTR_STAMINA );
+  r = floor( attribute_base[ ATTR_STAMINA ] * m ) + floor( b * m );
+
+  if ( buffs.blessing_of_kings ) r = floor ( r * 1.10 );
+
+  return r;
 }
 
 // player_t::intellect() ===================================================
@@ -1370,11 +1385,23 @@ double player_t::stamina() SC_CONST
 double player_t::intellect() SC_CONST
 {
   double a = attribute[ ATTR_INTELLECT ];
+  double b = a - attribute_base[ ATTR_INTELLECT ];
+  double m = composite_attribute_multiplier( ATTR_INTELLECT );
+  double r;
 
-  a += buffs.mark_of_the_wild;
-  a += buffs.arcane_brilliance;
+  b += buffs.mark_of_the_wild -> current_value;
+  b += buffs.arcane_brilliance -> value();
 
-  return a * composite_attribute_multiplier( ATTR_INTELLECT );
+  if ( race == RACE_GNOME )
+  {
+    b = floor( b * 1.05 );
+  }
+
+  r = floor( attribute_base[ ATTR_INTELLECT ] * m ) + floor( b * m );
+
+  if ( buffs.blessing_of_kings ) r = floor ( r * 1.10 );
+
+  return r;
 }
 
 // player_t::spirit() ======================================================
@@ -1382,11 +1409,23 @@ double player_t::intellect() SC_CONST
 double player_t::spirit() SC_CONST
 {
   double a = attribute[ ATTR_SPIRIT ];
+  double b = a - attribute_base[ ATTR_SPIRIT ];
+  double m = composite_attribute_multiplier( ATTR_SPIRIT );
+  double r;
 
-  a += buffs.mark_of_the_wild;
-  a += buffs.divine_spirit;
+  b += buffs.mark_of_the_wild -> current_value;
+  b += buffs.divine_spirit;
 
-  return a * composite_attribute_multiplier( ATTR_SPIRIT );
+  if ( race == RACE_HUMAN )
+  {
+    b = floor( b * 1.03 );
+  }
+
+  r = floor( attribute_base[ ATTR_SPIRIT ] * m ) + floor( b * m );
+
+  if ( buffs.blessing_of_kings ) r = floor ( r * 1.10 );
+
+  return r;
 }
 
 // player_t::combat_begin ==================================================
@@ -1401,7 +1440,6 @@ void player_t::combat_begin()
   }
 
   if ( sim -> overrides.abominations_might     ) buffs.abominations_might = 1;
-  if ( sim -> overrides.arcane_brilliance      ) buffs.arcane_brilliance = 60;
   if ( sim -> overrides.battle_shout           ) buffs.battle_shout = 548;
   if ( sim -> overrides.blessing_of_kings      ) buffs.blessing_of_kings = 1;
   if ( sim -> overrides.blessing_of_might      ) buffs.blessing_of_might = 688;
@@ -1410,14 +1448,29 @@ void player_t::combat_begin()
   if ( sim -> overrides.ferocious_inspiration  ) buffs.ferocious_inspiration = 1;
   if ( sim -> overrides.fortitude              ) buffs.fortitude = 215;
   if ( sim -> overrides.mana_spring            ) buffs.mana_spring = 91.0 * 1.2;
-  if ( sim -> overrides.mark_of_the_wild       ) buffs.mark_of_the_wild = 52;
-  if ( sim -> overrides.rampage                ) buffs.rampage = 1;
   if ( sim -> overrides.replenishment          ) buffs.replenishment = 1;
   if ( sim -> overrides.strength_of_earth      ) buffs.strength_of_earth = 178;
   if ( sim -> overrides.totem_of_wrath         ) buffs.totem_of_wrath = 280;
   if ( sim -> overrides.unleashed_rage         ) buffs.unleashed_rage = 1;
   if ( sim -> overrides.windfury_totem         ) buffs.windfury_totem = 0.20;
   if ( sim -> overrides.wrath_of_air           ) buffs.wrath_of_air = 1;
+
+  if ( ( race == RACE_DRAENEI ) || sim -> overrides.heroic_presence )
+  {
+    buffs.heroic_presence = 0.01;
+  }
+  else if ( party != 0 )
+  {
+    player_t* q = sim -> player_list;
+    while ( q )
+    {
+       if ( ( q != this ) && ( q -> party == party ) && ( ! q -> quiet ) && ( ! q -> is_pet() ) )
+       {
+         q -> buffs.heroic_presence = 0.01;
+       }
+       q = q -> next;
+    }    
+  }
 
   init_resources( true );
 
@@ -2521,7 +2574,7 @@ struct use_item_t : public action_t
       if( e.max_stacks  <= 0 ) e.max_stacks  = 1;
       if( e.proc_chance <= 0 ) e.proc_chance = 1;
       
-      buff = new stat_buff_t( sim, player, use_name, e.stat, e.amount, e.max_stacks, e.duration, 0, e.proc_chance );
+      buff = new stat_buff_t( player, use_name, e.stat, e.amount, e.max_stacks, e.duration, 0, e.proc_chance );
     }
     else assert( false );
 
@@ -2825,6 +2878,7 @@ bool player_t::save( FILE* file, int save_type )
     util_t::fprintf( file, "%s=%s\n", util_t::player_type_string( type ), name() );
     util_t::fprintf( file, "origin=%s\n", origin_str.c_str() );
     util_t::fprintf( file, "level=%d\n", level );
+    util_t::fprintf( file, "race=%s\n", race_str.c_str() );
 
     if ( professions_str.size() > 0 )
     {
@@ -2953,7 +3007,7 @@ std::vector<option_t>& player_t::get_options()
       { "name",                                 OPT_STRING,   &( name_str                                     ) },
       { "origin",                               OPT_STRING,   &( origin_str                                   ) },
       { "id",                                   OPT_STRING,   &( id_str                                       ) },
-      { "talents",                              OPT_FUNC,     ( void* ) ::parse_talent_url                        },
+      { "talents",                              OPT_FUNC,     ( void* ) ::parse_talent_url                      },
       { "glyphs",                               OPT_STRING,   &( glyphs_str                                   ) },
       { "race",                                 OPT_STRING,   &( race_str                                     ) },
       { "level",                                OPT_INT,      &( level                                        ) },
@@ -3075,47 +3129,48 @@ std::vector<option_t>& player_t::get_options()
 
 player_t* player_t::create( sim_t*             sim,
                             const std::string& type,
-                            const std::string& name )
+                            const std::string& name,
+                            int race_type )
 {
   if ( type == "death_knight" )
   {
-    return player_t::create_death_knight( sim, name );
+    return player_t::create_death_knight( sim, name, race_type );
   }
   else if ( type == "druid" )
   {
-    return player_t::create_druid( sim, name );
+    return player_t::create_druid( sim, name, race_type );
   }
   else if ( type == "hunter" )
   {
-    return player_t::create_hunter( sim, name );
+    return player_t::create_hunter( sim, name, race_type );
   }
   else if ( type == "mage" )
   {
-    return player_t::create_mage( sim, name );
+    return player_t::create_mage( sim, name, race_type );
   }
   else if ( type == "priest" )
   {
-    return player_t::create_priest( sim, name );
+    return player_t::create_priest( sim, name, race_type );
   }
   else if ( type == "paladin" )
   {
-    return player_t::create_paladin( sim, name );
+    return player_t::create_paladin( sim, name, race_type );
   }
   else if ( type == "rogue" )
   {
-    return player_t::create_rogue( sim, name );
+    return player_t::create_rogue( sim, name, race_type );
   }
   else if ( type == "shaman" )
   {
-    return player_t::create_shaman( sim, name );
+    return player_t::create_shaman( sim, name, race_type );
   }
   else if ( type == "warlock" )
   {
-    return player_t::create_warlock( sim, name );
+    return player_t::create_warlock( sim, name, race_type );
   }
   else if ( type == "warrior" )
   {
-    return player_t::create_warrior( sim, name );
+    return player_t::create_warrior( sim, name, race_type );
   }
   else if ( type == "pet" )
   {

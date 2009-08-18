@@ -116,9 +116,14 @@ double target_t::time_to_die() SC_CONST
 
 double target_t::health_percentage() SC_CONST
 {
-  if ( initial_health <= 0 ) return 100;
-
-  return 100.0 * current_health / initial_health;
+  if ( initial_health > 0 ) 
+  {
+    return 100.0 * current_health / initial_health;
+  }
+  else
+  {
+    return 100.0 * ( sim -> max_time - sim -> current_time ) / sim -> max_time;
+  }
 }
 
 // target_t::base_armor ======================================================
@@ -126,6 +131,20 @@ double target_t::health_percentage() SC_CONST
 double target_t::base_armor() SC_CONST
 {
   return armor;
+}
+
+// target_t::aura_gain ======================================================
+
+void target_t::aura_gain( const char* aura_name , int aura_id )
+{
+  if( sim -> log ) log_t::output( sim, "Target %s gains %s", name(), aura_name );
+}
+
+// target_t::aura_loss ======================================================
+
+void target_t::aura_loss( const char* aura_name , int aura_id )
+{
+  if( sim -> log ) log_t::output( sim, "Target %s loses %s", name(), aura_name );
 }
 
 // target_t::get_uptime =====================================================
@@ -174,16 +193,12 @@ void target_t::init()
     }
   }
 
-  uptimes.blood_frenzy         = get_uptime( "blood_frenzy"         );
-  uptimes.improved_scorch      = get_uptime( "improved_scorch"      );
-  uptimes.improved_shadow_bolt = get_uptime( "improved_shadow_bolt" );
   uptimes.invulnerable         = get_uptime( "invulnerable"         );
   uptimes.master_poisoner      = get_uptime( "master_poisoner"      );
   uptimes.savage_combat        = get_uptime( "savage_combat"        );
   uptimes.trauma               = get_uptime( "trauma"               );
   uptimes.totem_of_wrath       = get_uptime( "totem_of_wrath"       );
   uptimes.vulnerable           = get_uptime( "vulnerable"           );
-  uptimes.winters_chill        = get_uptime( "winters_chill"        );
   uptimes.winters_grasp        = get_uptime( "winters_grasp"        );
 }
 
@@ -208,12 +223,9 @@ void target_t::reset()
 void target_t::combat_begin()
 {
   if ( sim -> overrides.bleeding              ) debuffs.bleeding = 1;
-  if ( sim -> overrides.blood_frenzy          ) debuffs.blood_frenzy = 1;
   if ( sim -> overrides.crypt_fever           ) debuffs.crypt_fever = 1;
   if ( sim -> overrides.curse_of_elements     ) debuffs.curse_of_elements = 13;
   if ( sim -> overrides.hunters_mark          ) debuffs.hunters_mark = 500 * 1.5;
-  if ( sim -> overrides.improved_scorch       ) debuffs.improved_scorch = 5;
-  if ( sim -> overrides.improved_shadow_bolt  ) debuffs.improved_shadow_bolt = 5;
   if ( sim -> overrides.judgement_of_wisdom   ) debuffs.judgement_of_wisdom = 1;
   if ( sim -> overrides.master_poisoner       ) debuffs.master_poisoner = 1;
   if ( sim -> overrides.misery                ) debuffs.misery = 3;
@@ -223,8 +235,6 @@ void target_t::combat_begin()
   if ( sim -> overrides.sunder_armor          ) debuffs.sunder_armor = 0.20;
   if ( sim -> overrides.thunder_clap          ) debuffs.thunder_clap = 1;
   if ( sim -> overrides.totem_of_wrath        ) debuffs.totem_of_wrath = 1;
-  if ( sim -> overrides.trauma                ) debuffs.trauma = 1;
-  if ( sim -> overrides.winters_chill         ) debuffs.winters_chill = 5;
 
   if ( sim -> overrides.bloodlust )
   {

@@ -196,7 +196,7 @@ struct shaman_t : public player_t
   };
   tiers_t tiers;
 
-  shaman_t( sim_t* sim, const std::string& name ) : player_t( sim, SHAMAN, name )
+  shaman_t( sim_t* sim, const std::string& name, int race_type = RACE_NONE ) : player_t( sim, SHAMAN, name, race_type )
   {
     for( int i=0; i < ELEMENT_MAX; i++ ) active_totems[ i ] = 0;
 
@@ -217,6 +217,7 @@ struct shaman_t : public player_t
   // Character Definition
   virtual void      init_rating();
   virtual void      init_glyphs();
+  virtual void      init_race();
   virtual void      init_base();
   virtual void      init_items();
   virtual void      init_scaling();
@@ -257,7 +258,6 @@ struct shaman_attack_t : public attack_t
     base_dd_min = base_dd_max = 1;
     shaman_t* p = player -> cast_shaman();
     base_multiplier *= 1.0 + p -> talents.weapon_mastery * 0.1/3;
-    base_crit += p -> talents.thundering_strikes * 0.01;
     if ( p -> dual_wield() ) base_hit += p -> talents.dual_wield_specialization * 0.02;
   }
 
@@ -277,9 +277,7 @@ struct shaman_spell_t : public spell_t
   shaman_spell_t( const char* n, player_t* p, int s, int t ) :
       spell_t( n, p, RESOURCE_MANA, s, t ), base_cost_reduction( 0 )
   {
-    shaman_t* shaman = p -> cast_shaman();
-    base_crit += shaman -> talents.thundering_strikes * 0.01;
-    base_crit += shaman -> talents.blessing_of_the_eternals * 0.02;
+
   }
 
   virtual double cost() SC_CONST;
@@ -309,6 +307,14 @@ struct spirit_wolf_pet_t : public pet_t
       background = true;
       repeating = true;
       may_crit = true;
+
+      pet_t* p = player -> cast_pet();
+
+      // Orc Command Racial
+      if ( p -> owner -> race == RACE_ORC )
+      {
+        base_multiplier *= 1.05;
+      }
 
       // There are actually two wolves.....
       base_multiplier *= 2.0;
@@ -2902,37 +2908,58 @@ void shaman_t::init_glyphs()
   }
 }
 
+// shaman_t::init_race ======================================================
+
+void shaman_t::init_race()
+{
+  race = util_t::parse_race_type( race_str );
+  switch ( race )
+  {
+  case RACE_DRAENEI:
+  case RACE_TAUREN:
+  case RACE_ORC:
+  case RACE_TROLL:
+    break;
+  default:
+    race = RACE_ORC;
+    race_str = util_t::race_type_string( race );
+  }
+
+  player_t::init_race();
+}
+
 // shaman_t::init_base ========================================================
 
 void shaman_t::init_base()
 {
-  attribute_base[ ATTR_STRENGTH  ] = 125;
-  attribute_base[ ATTR_AGILITY   ] =  69;
-  attribute_base[ ATTR_STAMINA   ] = 135;
-  attribute_base[ ATTR_INTELLECT ] = 123;
-  attribute_base[ ATTR_SPIRIT    ] = 140;
+  attribute_base[ ATTR_STRENGTH  ] = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_STRENGTH );
+  attribute_base[ ATTR_AGILITY   ] = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_AGILITY );
+  attribute_base[ ATTR_STAMINA   ] = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_STAMINA );
+  attribute_base[ ATTR_INTELLECT ] = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_INTELLECT );
+  attribute_base[ ATTR_SPIRIT    ] = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_SPIRIT );
+  resource_base[ RESOURCE_HEALTH ] = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_HEALTH );
+  resource_base[ RESOURCE_MANA   ] = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_MANA );
+  base_spell_crit                  = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_SPELL_CRIT );
+  base_attack_crit                 = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_MELEE_CRIT );
+  initial_spell_crit_per_intellect = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_SPELL_CRIT_PER_INT );
+  initial_attack_crit_per_agility  = rating_t::get_attribute_base( level, SHAMAN, race, BASE_STAT_MELEE_CRIT_PER_AGI );
 
   attribute_multiplier_initial[ ATTR_INTELLECT ] *= 1.0 + talents.ancestral_knowledge * 0.02;
   attribute_multiplier_initial[ ATTR_STAMINA   ] *= 1.0 + talents.toughness           * 0.02;
   base_attack_expertise = 0.25 * talents.unleashed_rage * 0.03;
 
-  base_spell_crit = 0.0220045;
-  initial_spell_crit_per_intellect = rating_t::interpolate( level, 0.01/60.0, 0.01/80.0, 0.01/166.79732 );
-
   base_attack_power = ( level * 2 ) - 20;
-  base_attack_crit  = 0.0292234;
   initial_attack_power_per_strength = 1.0;
   initial_attack_power_per_agility  = 1.0;
-  initial_attack_crit_per_agility = rating_t::interpolate( level, 0.01/25.0, 0.01/40.0, 0.01/83.388 );
-
-
-  resource_base[ RESOURCE_HEALTH ] = 3185;
-  resource_base[ RESOURCE_MANA   ] = rating_t::interpolate( level, 1415, 2680, 4396 );
 
   health_per_stamina = 10;
   mana_per_intellect = 15;
 
   mp5_per_intellect = util_t::talent_rank( talents.unrelenting_storm, 3, 0.04 );
+
+  base_spell_crit  += talents.blessing_of_the_eternals * 0.02;
+  base_spell_crit  += talents.thundering_strikes * 0.01;
+  base_attack_crit += talents.thundering_strikes * 0.01;
 
   if ( tiers.t6_2pc_elemental )
   {
@@ -3029,26 +3056,26 @@ void shaman_t::init_buffs()
 
   // buff_t( sim, player, name, max_stack, duration, cooldown, proc_chance, quiet )
 
-  buffs_elemental_devastation = new buff_t( sim, this, "elemental_devastation", 1,  10.0, 0.0, talents.elemental_devastation );
-  buffs_elemental_focus       = new buff_t( sim, this, "elemental_focus",       2,  15.0, 0.0, talents.elemental_focus       );
-  buffs_elemental_mastery     = new buff_t( sim, this, "elemental_mastery",     1,  15.0, 0.0, talents.elemental_mastery     );
-  buffs_flurry                = new buff_t( sim, this, "flurry",                3,   0.0, 0.0, talents.flurry                );
-  buffs_lightning_shield      = new buff_t( sim, this, "lightning_shield",      3 + 2 * talents.static_shock );
-  buffs_maelstrom_weapon      = new buff_t( sim, this, "maelstrom_weapon",      5,  30.0 );
-  buffs_nature_vulnerability  = new buff_t( sim, this, "nature_vulnerability",  4,  12.0 );
-  buffs_natures_swiftness     = new buff_t( sim, this, "natures_swiftness" );
-  buffs_shamanistic_rage      = new buff_t( sim, this, "shamanistic_rage",      1,  15.0 );
-  buffs_totem_of_wrath_glyph  = new buff_t( sim, this, "totem_of_wrath_glyph",  1, 300.0, 0.0, glyphs.totem_of_wrath );
-  buffs_water_shield          = new buff_t( sim, this, "water_shield",          1, 600.0 );
+  buffs_elemental_devastation = new buff_t( this, "elemental_devastation", 1,  10.0, 0.0, talents.elemental_devastation );
+  buffs_elemental_focus       = new buff_t( this, "elemental_focus",       2,  15.0, 0.0, talents.elemental_focus       );
+  buffs_elemental_mastery     = new buff_t( this, "elemental_mastery",     1,  15.0, 0.0, talents.elemental_mastery     );
+  buffs_flurry                = new buff_t( this, "flurry",                3,   0.0, 0.0, talents.flurry                );
+  buffs_lightning_shield      = new buff_t( this, "lightning_shield",      3 + 2 * talents.static_shock );
+  buffs_maelstrom_weapon      = new buff_t( this, "maelstrom_weapon",      5,  30.0 );
+  buffs_nature_vulnerability  = new buff_t( this, "nature_vulnerability",  4,  12.0 );
+  buffs_natures_swiftness     = new buff_t( this, "natures_swiftness" );
+  buffs_shamanistic_rage      = new buff_t( this, "shamanistic_rage",      1,  15.0 );
+  buffs_totem_of_wrath_glyph  = new buff_t( this, "totem_of_wrath_glyph",  1, 300.0, 0.0, glyphs.totem_of_wrath );
+  buffs_water_shield          = new buff_t( this, "water_shield",          1, 600.0 );
 
   // stat_buff_t( sim, player, name, stat, amount, max_stack, duration, cooldown, proc_chance, quiet )
 
-  buffs_dueling           = new stat_buff_t( sim, this, "dueling",           STAT_HASTE_RATING,  60, 1,  6.0, 10.01, totems.dueling        );
-  buffs_electrifying_wind = new stat_buff_t( sim, this, "electrifying_wind", STAT_HASTE_RATING, 200, 1, 12.0,  6.01, totems.electrifying_wind * 0.70 );
-  buffs_indomitability    = new stat_buff_t( sim, this, "indomitability",    STAT_ATTACK_POWER, 120, 1, 10.0, 10.01, totems.indomitability );
-  buffs_quaking_earth     = new stat_buff_t( sim, this, "quaking_earth",     STAT_ATTACK_POWER, 200, 1, 18.0, 20.01, totems.quaking_earth * 0.80 );
-  buffs_stonebreaker      = new stat_buff_t( sim, this, "stonebreaker",      STAT_ATTACK_POWER, 110, 1, 10.0, 10.01, totems.stonebreaker   );
-  buffs_tundra            = new stat_buff_t( sim, this, "tundra",            STAT_ATTACK_POWER,  94, 1, 10.0, 10.01, totems.tundra         );
+  buffs_dueling           = new stat_buff_t( this, "dueling",           STAT_HASTE_RATING,  60, 1,  6.0, 10.01, totems.dueling        );
+  buffs_electrifying_wind = new stat_buff_t( this, "electrifying_wind", STAT_HASTE_RATING, 200, 1, 12.0,  6.01, totems.electrifying_wind * 0.70 );
+  buffs_indomitability    = new stat_buff_t( this, "indomitability",    STAT_ATTACK_POWER, 120, 1, 10.0, 10.01, totems.indomitability );
+  buffs_quaking_earth     = new stat_buff_t( this, "quaking_earth",     STAT_ATTACK_POWER, 200, 1, 18.0, 20.01, totems.quaking_earth * 0.80 );
+  buffs_stonebreaker      = new stat_buff_t( this, "stonebreaker",      STAT_ATTACK_POWER, 110, 1, 10.0, 10.01, totems.stonebreaker   );
+  buffs_tundra            = new stat_buff_t( this, "tundra",            STAT_ATTACK_POWER,  94, 1, 10.0, 10.01, totems.tundra         );
 }
 
 // shaman_t::init_gains ======================================================
@@ -3369,9 +3396,9 @@ int shaman_t::decode_set( item_t& item )
 
 // player_t::create_shaman  =================================================
 
-player_t* player_t::create_shaman( sim_t* sim, const std::string& name )
+player_t* player_t::create_shaman( sim_t* sim, const std::string& name, int race_type )
 {
-  shaman_t* p = new shaman_t( sim, name );
+  shaman_t* p = new shaman_t( sim, name, race_type );
 
   new spirit_wolf_pet_t( sim, p );
 
@@ -3384,7 +3411,7 @@ void player_t::shaman_init( sim_t* sim )
 {
   for ( player_t* p = sim -> player_list; p; p = p -> next )
   {
-    p -> buffs.elemental_oath = new buff_t( sim, p, "elemental_oath", 1, 15.0 );
+    p -> buffs.elemental_oath = new buff_t( p, "elemental_oath", 1, 15.0 );
   }
 }
 
