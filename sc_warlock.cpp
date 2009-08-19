@@ -264,6 +264,8 @@ struct warlock_pet_t : public pet_t
       pet_t( sim, owner, pet_name ), pet_type( pt ), damage_modifier( 1.0 ), melee( 0 )
   {}
 
+  virtual bool ooc_buffs() { return true; }
+
   virtual void init_base()
   {
     pet_t::init_base();
@@ -4271,7 +4273,7 @@ player_t* player_t::create_warlock( sim_t* sim, const std::string& name, int rac
 void player_t::warlock_init( sim_t* sim )
 {
   target_t* t = sim -> target;
-  t -> debuffs.improved_shadow_bolt = new debuff_t( sim, "improved_shadow_bolt", 1, ( sim -> overrides.improved_shadow_bolt ? 0.0 : 30.0 ) );
+  t -> debuffs.improved_shadow_bolt = new debuff_t( sim, "improved_shadow_bolt", 1, 30.0 );
 }
 
 // player_t::warlock_combat_begin ===========================================
@@ -4279,6 +4281,6 @@ void player_t::warlock_init( sim_t* sim )
 void player_t::warlock_combat_begin( sim_t* sim )
 {
   target_t* t = sim -> target;
-  if ( sim -> overrides.improved_shadow_bolt ) t -> debuffs.improved_shadow_bolt -> trigger();
+  if ( sim -> overrides.improved_shadow_bolt ) t -> debuffs.improved_shadow_bolt -> override();
 }
 
