@@ -197,15 +197,12 @@ double action_t::cost() SC_CONST
 
   if ( resource == RESOURCE_MANA )
   {
-    c -= player -> buffs.mana_cost_reduction;
-    if ( c < 0 ) c = 0;
-
-    if ( player -> buffs.power_infusion ) c *= 0.80;
+    if ( player -> buffs.power_infusion -> check() ) c *= 0.80;
   }
 
   if ( sim -> debug ) log_t::output( sim, "action_t::cost: %s %.2f %.2f %s", name(), base_cost, c, util_t::resource_type_string( resource ) );
 
-  return c;
+  return floor( c );
 }
 
 // action_t::travel_time =====================================================
@@ -266,20 +263,15 @@ void action_t::player_buff()
 
   if ( p -> type != PLAYER_GUARDIAN )
   {
-    if ( school == SCHOOL_SHADOW )
+    if ( school == SCHOOL_PHYSICAL )
     {
-      // That needs to be here because shadow form affects ALL shadow damage (e.g. trinkets)
-      if ( p -> buffs.shadow_form )
+      if ( p -> buffs.hysteria )
       {
-        player_multiplier *= 1.15;
+	player_multiplier *= 1.2;
       }
     }
-    else if ( p -> buffs.hysteria && school == SCHOOL_PHYSICAL )
-    {
-      player_multiplier *= 1.2;
-    }
 
-    if ( sim -> auras.sanctified_retribution || p -> buffs.ferocious_inspiration  )
+    if ( sim -> auras.sanctified_retribution || sim -> auras.ferocious_inspiration -> up() )
     {
       player_multiplier *= 1.03;
     }
@@ -342,8 +334,10 @@ void action_t::target_debuff( int dmg_type )
   }
   else
   {
-    target_multiplier *= 1.0 + ( std::max( (double) t -> debuffs.curse_of_elements, t -> debuffs.earth_and_moon -> value() ) * 0.01 );
-    if ( t -> debuffs.curse_of_elements ) target_penetration += 88;
+    target_multiplier *= 1.0 + ( std::max( t -> debuffs.curse_of_elements -> value(), 
+					   t -> debuffs.earth_and_moon    -> value() ) * 0.01 );
+
+    if ( t -> debuffs.curse_of_elements -> check() ) target_penetration += 88;
   }
 
   if ( school == SCHOOL_BLEED )
@@ -360,7 +354,7 @@ void action_t::target_debuff( int dmg_type )
     target_dd_adder += t -> debuffs.hemorrhage;
   }
 
-  if ( t -> debuffs.totem_of_wrath  ||
+  if ( t -> debuffs.totem_of_wrath -> up()  ||
        t -> debuffs.master_poisoner )
   {
     target_crit += 0.03;
@@ -370,7 +364,7 @@ void action_t::target_debuff( int dmg_type )
   {
     if ( p -> position == POSITION_RANGED )
     {
-      target_attack_power += t -> debuffs.hunters_mark;
+      target_attack_power += t -> debuffs.hunters_mark -> value();
     }
   }
   if ( base_spell_power_multiplier > 0 )
@@ -380,11 +374,9 @@ void action_t::target_debuff( int dmg_type )
 
   if ( t -> vulnerable ) target_multiplier *= 2.0;
 
-  t -> uptimes.totem_of_wrath  -> update( t -> debuffs.totem_of_wrath  != 0 );
   t -> uptimes.master_poisoner -> update( t -> debuffs.master_poisoner != 0 );
 
-  if ( t -> debuffs.winters_grasp ) target_hit += 0.02;
-  t -> uptimes.winters_grasp -> update( t -> debuffs.winters_grasp != 0 );
+  if ( t -> debuffs.winters_grasp -> up() ) target_hit += 0.02;
 
   if ( sim -> debug )
     log_t::output( sim, "action_t::target_debuff: %s multiplier=%.2f hit=%.2f crit=%.2f attack_power=%.2f spell_power=%.2f penetration=%.0f",
@@ -1024,11 +1016,11 @@ bool action_t::ready()
       return false;
 
   if ( bloodlust_active > 0 )
-    if ( ! player -> buffs.bloodlust )
+    if ( ! player -> buffs.bloodlust -> check() )
       return false;
 
   if ( bloodlust_active < 0 )
-    if ( player -> buffs.bloodlust )
+    if ( player -> buffs.bloodlust -> check() )
       return false;
 
   if ( sync_action && ! sync_action -> ready() )

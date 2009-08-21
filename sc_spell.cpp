@@ -30,15 +30,15 @@ double spell_t::haste() SC_CONST
 
   if ( p -> type != PLAYER_GUARDIAN )
   {
-    if (      p -> buffs.bloodlust      ) h *= 1.0 / ( 1.0 + 0.30 );
-    else if ( p -> buffs.power_infusion ) h *= 1.0 / ( 1.0 + 0.20 );
+    if (      p -> buffs.bloodlust      -> check() ) h *= 1.0 / ( 1.0 + 0.30 );
+    else if ( p -> buffs.power_infusion -> check() ) h *= 1.0 / ( 1.0 + 0.20 );
 
     if ( sim -> auras.swift_retribution || sim -> auras.improved_moonkin -> up() )
     {
       h *= 1.0 / ( 1.0 + 0.03 );
     }
 
-    if ( p -> buffs.wrath_of_air )
+    if ( sim -> auras.wrath_of_air -> up() )
     {
       h *= 1.0 / ( 1.0 + 0.05 );
     }
@@ -69,13 +69,9 @@ double spell_t::gcd() SC_CONST
 
 double spell_t::execute_time() SC_CONST
 {
-  if ( base_execute_time == 0 ) return 0;
-
-  double t = base_execute_time - player -> buffs.cast_time_reduction;
-  if ( t < 0 ) t = 0;
-
+  double t = base_execute_time;
+  if ( t <= 0 ) return 0;
   t *= haste();
-
   return t;
 }
 
@@ -119,7 +115,7 @@ void spell_t::target_debuff( int dmg_type )
 
   target_t* t = sim -> target;
 
-  target_hit += std::max( t -> debuffs.improved_faerie_fire -> value(), (double) t -> debuffs.misery ) * 0.01;
+  target_hit += std::max( t -> debuffs.improved_faerie_fire -> value(), t -> debuffs.misery -> value() ) * 0.01;
 
   int crit_debuff = std::max( std::max( t -> debuffs.winters_chill -> stack(), 
 					t -> debuffs.improved_scorch -> stack() ),

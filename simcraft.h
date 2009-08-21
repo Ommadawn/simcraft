@@ -674,12 +674,13 @@ struct buff_t
   player_t* player;
   std::string name_str;
   std::vector<std::string> aura_str;
+  std::vector<double> stack_occurrence;
   int current_stack, max_stack;
   double current_value, react, duration, cooldown, cooldown_ready, default_chance;
-  double last_start, interval_sum, uptime_sum;
-  int64_t up_count, down_count, interval_count, start_count, refresh_count;
+  double last_start, last_trigger, start_intervals_sum, trigger_intervals_sum, uptime_sum;
+  int64_t up_count, down_count, start_intervals, trigger_intervals, start_count, refresh_count;
   int64_t trigger_attempts, trigger_successes;
-  double uptime_pct, benefit_pct, trigger_pct, avg_interval, avg_start, avg_refresh;
+  double uptime_pct, benefit_pct, trigger_pct, avg_start_interval, avg_trigger_interval, avg_start, avg_refresh;
   bool constant, quiet;
   int aura_id;
   event_t* expiration;
@@ -709,7 +710,7 @@ struct buff_t
   virtual double remains();
   virtual bool   remains_gt( double time );
   virtual bool   remains_lt( double time );
-  virtual bool   may_react();
+  virtual bool   may_react( int stacks=0 );
   virtual bool   trigger  ( int stacks=1, double value=-1.0, double chance=-1.0 );
   virtual void   increment( int stacks=1, double value=-1.0 );
   virtual void   decrement( int stacks=1, double value=-1.0 );
@@ -722,6 +723,7 @@ struct buff_t
   virtual void   aura_loss();
   virtual void   merge( buff_t* other_buff );
   virtual void   analyze();
+  virtual void   init();
   virtual const char* name() { return name_str.c_str(); }
 
   static buff_t* find(    sim_t*, const std::string& name );
@@ -883,8 +885,10 @@ struct sim_t
     int curse_of_elements;
     int divine_spirit;
     int earth_and_moon;
+    int elemental_oath;
     int faerie_fire;
     int ferocious_inspiration;
+    int flametongue_totem;
     int fortitude;
     int heroic_presence;
     int hunters_mark;
@@ -919,16 +923,24 @@ struct sim_t
   struct auras_t
   {
     // New Buffs
-    aura_t* moonkin;
+    aura_t* elemental_oath;
+    aura_t* ferocious_inspiration;
+    aura_t* flametongue_totem;
     aura_t* improved_moonkin;
+    aura_t* moonkin;
     aura_t* rampage;
+    aura_t* strength_of_earth;
+    aura_t* totem_of_wrath;
+    aura_t* trueshot;
+    aura_t* unleashed_rage;
+    aura_t* windfury_totem;
+    aura_t* wrath_of_air;
     // Old Buffs
     int old_buffs;
     int celerity;
     int leader_of_the_pack;
     int sanctified_retribution;
     int swift_retribution;
-    int trueshot;
     auras_t() { memset( (void*) this, 0x0, sizeof( auras_t ) ); }
     void reset()
     { 
@@ -942,9 +954,6 @@ struct sim_t
   struct expirations_t
   {
     event_t* abominations_might;
-    event_t* ferocious_inspiration;
-    event_t* rampage;
-    event_t* unleashed_rage;
     void reset() { memset( ( void* ) this, 0x00, sizeof( expirations_t ) ); }
     expirations_t() { reset(); }
   };
@@ -1346,11 +1355,16 @@ struct player_t
   {
     // New Buffs
     buff_t* arcane_brilliance;
-    buff_t* elemental_oath;
+    buff_t* bloodlust;
+    buff_t* demonic_pact;
+    buff_t* divine_spirit;
+    buff_t* fortitude;
     buff_t* innervate;
     buff_t* mark_of_the_wild;
     buff_t* mongoose_mh;
     buff_t* mongoose_oh;
+    buff_t* power_infusion;
+
     // Old Buffs
     int       old_buffs;
     int       abominations_might;
@@ -1358,38 +1372,13 @@ struct player_t
     int       blessing_of_kings;
     int       blessing_of_might;
     double    blessing_of_wisdom;
-    double    divine_spirit;
-    int       bloodlust;
-    double    cast_time_reduction;
-    double    demonic_pact;
-    pet_t*    demonic_pact_pet;
-    int       ferocious_inspiration;
-    double    flametongue_totem;
     player_t* focus_magic;
     int       focus_magic_feedback;
-    double    fortitude;
     double    heroic_presence;
     int       hysteria;
-    double    mana_cost_reduction;
     double    mana_spring;
-    int       power_infusion;
-    int       rampage;
     int       replenishment;
-    int       shadow_form;
-    double    strength_of_earth;
-    double    totem_of_wrath;
     int       tricks_of_the_trade;
-    int       unleashed_rage;
-    double    windfury_totem;
-    int       water_elemental;
-    int       wrath_of_air;
-    int       tier4_2pc,  tier4_4pc;
-    int       tier5_2pc,  tier5_4pc;
-    int       tier6_2pc,  tier6_4pc;
-    int       tier7_2pc,  tier7_4pc;
-    int       tier8_2pc,  tier8_4pc;
-    int       tier9_2pc,  tier9_4pc;
-    int       tier10_2pc, tier10_4pc;
     buffs_t() { memset( (void*) this, 0x0, sizeof( buffs_t ) ); }
     void reset()
     { 
@@ -1405,45 +1394,16 @@ struct player_t
     event_t* hysteria;
     event_t* replenishment;
     event_t* tricks_of_the_trade;
-    event_t *tier4_2pc,  *tier4_4pc;
-    event_t *tier5_2pc,  *tier5_4pc;
-    event_t *tier6_2pc,  *tier6_4pc;
-    event_t *tier7_2pc,  *tier7_4pc;
-    event_t *tier8_2pc,  *tier8_4pc;
-    event_t *tier9_2pc,  *tier9_4pc;
-    event_t *tier10_2pc, *tier10_4pc;
     void reset() { memset( ( void* ) this, 0x00, sizeof( expirations_t ) ); }
     expirations_t() { reset(); }
   };
   expirations_t expirations;
-
-  struct cooldowns_t
-  {
-    double bloodlust;
-    double tier4_2pc,  tier4_4pc;
-    double tier5_2pc,  tier5_4pc;
-    double tier6_2pc,  tier6_4pc;
-    double tier7_2pc,  tier7_4pc;
-    double tier8_2pc,  tier8_4pc;
-    double tier9_2pc,  tier9_4pc;
-    double tier10_2pc, tier10_4pc;
-    void reset() { memset( ( void* ) this, 0x00, sizeof( cooldowns_t ) ); }
-    cooldowns_t() { reset(); }
-  };
-  cooldowns_t cooldowns;
 
   struct uptimes_t
   {
     uptime_t* moving;
     uptime_t* replenishment;
     uptime_t* stunned;
-    uptime_t *tier4_2pc,  *tier4_4pc;
-    uptime_t *tier5_2pc,  *tier5_4pc;
-    uptime_t *tier6_2pc,  *tier6_4pc;
-    uptime_t *tier7_2pc,  *tier7_4pc;
-    uptime_t *tier8_2pc,  *tier8_4pc;
-    uptime_t *tier9_2pc,  *tier9_4pc;
-    uptime_t *tier10_2pc, *tier10_4pc;
     void reset() { memset( ( void* ) this, 0x00, sizeof( uptimes_t ) ); }
     uptimes_t() { reset(); }
   };
@@ -1469,13 +1429,6 @@ struct player_t
     gain_t* vampiric_embrace;
     gain_t* vampiric_touch;
     gain_t* water_elemental;
-    gain_t *tier4_2pc,  *tier4_4pc;
-    gain_t *tier5_2pc,  *tier5_4pc;
-    gain_t *tier6_2pc,  *tier6_4pc;
-    gain_t *tier7_2pc,  *tier7_4pc;
-    gain_t *tier8_2pc,  *tier8_4pc;
-    gain_t *tier9_2pc,  *tier9_4pc;
-    gain_t *tier10_2pc, *tier10_4pc;
     void reset() { memset( ( void* ) this, 0x00, sizeof( gains_t ) ); }
     gains_t() { reset(); }
   };
@@ -1484,13 +1437,6 @@ struct player_t
   struct procs_t
   {
     proc_t* hat_donor;
-    proc_t *tier4_2pc,  *tier4_4pc;
-    proc_t *tier5_2pc,  *tier5_4pc;
-    proc_t *tier6_2pc,  *tier6_4pc;
-    proc_t *tier7_2pc,  *tier7_4pc;
-    proc_t *tier8_2pc,  *tier8_4pc;
-    proc_t *tier9_2pc,  *tier9_4pc;
-    proc_t *tier10_2pc, *tier10_4pc;
     void reset() { memset( ( void* ) this, 0x00, sizeof( procs_t ) ); }
     procs_t() { reset(); }
   };
@@ -1503,13 +1449,6 @@ struct player_t
     rng_t* lag_channel;
     rng_t* lag_gcd;
     rng_t* lag_queue;
-    rng_t *tier4_2pc,  *tier4_4pc;
-    rng_t *tier5_2pc,  *tier5_4pc;
-    rng_t *tier6_2pc,  *tier6_4pc;
-    rng_t *tier7_2pc,  *tier7_4pc;
-    rng_t *tier8_2pc,  *tier8_4pc;
-    rng_t *tier9_2pc,  *tier9_4pc;
-    rng_t *tier10_2pc, *tier10_4pc;
     void reset() { memset( ( void* ) this, 0x00, sizeof( rngs_t ) ); }
     rngs_t() { reset(); }
   };
@@ -1659,8 +1598,8 @@ struct player_t
   static void druid_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Hunter buff maintenance
-  static void hunter_init        ( sim_t* sim ) {}
-  static void hunter_combat_begin( sim_t* sim ) {}
+  static void hunter_init        ( sim_t* sim );
+  static void hunter_combat_begin( sim_t* sim );
   static void hunter_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Mage buff maintenance
@@ -1674,8 +1613,8 @@ struct player_t
   static void paladin_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Priest buff maintenance
-  static void priest_init        ( sim_t* sim ) {}
-  static void priest_combat_begin( sim_t* sim ) {}
+  static void priest_init        ( sim_t* sim );
+  static void priest_combat_begin( sim_t* sim );
   static void priest_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Rogue buff maintenance
@@ -1685,7 +1624,7 @@ struct player_t
 
   // Raid-wide Shaman buff maintenance
   static void shaman_init        ( sim_t* sim );
-  static void shaman_combat_begin( sim_t* sim ) {}
+  static void shaman_combat_begin( sim_t* sim );
   static void shaman_combat_end  ( sim_t* sim ) {}
 
   // Raid-wide Warlock buff maintenance
@@ -1793,14 +1732,18 @@ struct target_t
   {
     // New Buffs
     debuff_t* blood_frenzy;
+    debuff_t* curse_of_elements;
     debuff_t* earth_and_moon;
     debuff_t* faerie_fire;
     debuff_t* frostbite;
+    debuff_t* hunters_mark;
     debuff_t* improved_faerie_fire;
     debuff_t* improved_scorch;
     debuff_t* improved_shadow_bolt;
     debuff_t* mangle;
+    debuff_t* misery;
     debuff_t* slow;
+    debuff_t* totem_of_wrath;
     debuff_t* trauma;
     debuff_t* winters_chill;
     debuff_t* winters_grasp;
@@ -1808,20 +1751,15 @@ struct target_t
     int    old_buffs;
     int    bleeding;
     int    crypt_fever;
-    int    curse_of_elements;
     double expose_armor;
     double hemorrhage;
     int    hemorrhage_charges;
-    double hunters_mark;
     int    judgement_of_wisdom;
     int    master_poisoner;
-    int    misery;
-    int    misery_stack;
     int    poisoned;
     int    savage_combat;
     double sunder_armor;
     int    thunder_clap;
-    int    totem_of_wrath;
     debuffs_t() { memset( (void*) this, 0x0, sizeof( debuffs_t ) ); }
     void reset()
     { 
@@ -1835,16 +1773,13 @@ struct target_t
 
   struct expirations_t
   {
-    event_t* curse_of_elements;
     event_t* expose_armor;
     event_t* frozen;
     event_t* hemorrhage;
     event_t* hunters_mark;
-    event_t* misery;
     event_t* nature_vulnerability;
     event_t* shadow_vulnerability;
     event_t* shadow_weaving;
-    event_t* winters_grasp;
     void reset() { memset( ( void* ) this, 0x00, sizeof( expirations_t ) ); }
     expirations_t() { reset(); }
   };
@@ -1852,14 +1787,11 @@ struct target_t
 
   struct uptimes_t
   {
-    uptime_t* blood_frenzy;
     uptime_t* invulnerable;
     uptime_t* master_poisoner;
     uptime_t* savage_combat;
     uptime_t* trauma;
-    uptime_t* totem_of_wrath;
     uptime_t* vulnerable;
-    uptime_t* winters_grasp;
     void reset() { memset( ( void* ) this, 0x00, sizeof( uptimes_t ) ); }
     uptimes_t() { reset(); }
   };

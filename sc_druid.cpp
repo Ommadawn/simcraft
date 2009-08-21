@@ -50,6 +50,7 @@ struct druid_t : public player_t
   // Procs
   proc_t* procs_combo_points_wasted;
   proc_t* procs_primal_fury;
+  proc_t* procs_tier8_2pc;
 
   // Up-Times
   uptime_t* uptimes_energy_cap;
@@ -439,8 +440,8 @@ static void trigger_t8_2pc_feral( action_t* a )
   /  buff that OoC provides. OoC and t8_2pc_feral overwrite
   /  each other. Easier to treat it just (ab)use the OoC handling */
 
-  if ( p -> buffs_omen_of_clarity -> trigger(1, 1, 0.02) )
-    p -> procs.tier8_2pc -> occur();
+  if ( p -> buffs_omen_of_clarity -> trigger( 1, 1, 0.02 ) )
+    p -> procs_tier8_2pc -> occur();
 }
 
 // trigger_primal_fury =====================================================
@@ -1498,12 +1499,6 @@ void druid_spell_t::execute()
   {
     trigger_omen_of_clarity( this );
   }
-
-  if ( p -> tiers.t4_2pc_balance &&
-       p -> rngs.tier4_2pc -> roll( 0.05 ) )
-  {
-    p -> resource_gain( RESOURCE_MANA, 120.0, p -> gains.tier4_2pc );
-  }
 }
 
 // druid_spell_t::consume_resource =========================================
@@ -1597,10 +1592,10 @@ struct faerie_fire_t : public druid_spell_t
     if ( t -> debuffs.faerie_fire -> up() )
     {
       if ( t -> debuffs.improved_faerie_fire -> current_value >= p -> talents.improved_faerie_fire )
-	return false;
+	      return false;
 
-      if ( t -> debuffs.misery >= p -> talents.improved_faerie_fire )
-	return false;
+      if ( t -> debuffs.misery -> current_value > p -> talents.improved_faerie_fire )
+	      return false;
     }
 
     return druid_spell_t::ready();
@@ -2801,8 +2796,6 @@ void druid_t::init_items()
 
   if ( talents.moonkin_form )
   {
-    if ( set_bonus.tier4_2pc() ) tiers.t4_2pc_balance = 1;
-    if ( set_bonus.tier4_4pc() ) tiers.t4_4pc_balance = 1;
     if ( set_bonus.tier5_2pc() ) tiers.t5_2pc_balance = 1;
     if ( set_bonus.tier5_4pc() ) tiers.t5_4pc_balance = 1;
     if ( set_bonus.tier6_2pc() ) tiers.t6_2pc_balance = 1;
@@ -2818,8 +2811,6 @@ void druid_t::init_items()
   }
   else
   {
-    if ( set_bonus.tier4_2pc() ) tiers.t4_2pc_feral = 1;
-    if ( set_bonus.tier4_4pc() ) tiers.t4_4pc_feral = 1;
     if ( set_bonus.tier5_2pc() ) tiers.t5_2pc_feral = 1;
     if ( set_bonus.tier5_4pc() ) tiers.t5_4pc_feral = 1;
     if ( set_bonus.tier6_2pc() ) tiers.t6_2pc_feral = 1;
@@ -2866,6 +2857,7 @@ void druid_t::init_procs()
 
   procs_combo_points_wasted = get_proc( "combo_points_wasted", sim );
   procs_primal_fury         = get_proc( "primal_fury",         sim );
+  procs_tier8_2pc           = get_proc( "tier8_2pc",           sim );
 }
 
 // druid_t::init_uptimes ====================================================
@@ -3214,10 +3206,10 @@ std::vector<option_t>& druid_t::get_options()
 
 int druid_t::decode_set( item_t& item )
 {
-  if ( strstr( item.name(), "dreamwalker" ) ) return SET_T7;
-  if ( strstr( item.name(), "nightsong"   ) ) return SET_T8;
-  if ( strstr( item.name(), "malfurions"  ) ) return SET_T9; // Alliance
-  if ( strstr( item.name(), "runetotem"   ) ) return SET_T9; // Horde
+  if      ( strstr( item.name(), "dreamwalker" ) ) return SET_T7;
+  else if ( strstr( item.name(), "nightsong"   ) ) return SET_T8;
+  else if ( strstr( item.name(), "malfurion"   ) ) return SET_T9; // Alliance
+  else if ( strstr( item.name(), "runetotem"   ) ) return SET_T9; // Horde
   return SET_NONE;
 }
 
