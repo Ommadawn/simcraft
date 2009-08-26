@@ -353,7 +353,6 @@ void priest_spell_t::execute()
     if ( result == RESULT_CRIT )
     {
       p -> buffs_surge_of_light  -> trigger( 1, 1.0, p -> talents.surge_of_light * 0.25 );
-      p -> buffs_glyph_of_shadow -> trigger();
     }
   }
 
@@ -795,7 +794,16 @@ struct devouring_plague_burst_t : public priest_spell_t
 
   virtual void execute()
   {
+    priest_t* p = player -> cast_priest();
+
     priest_spell_t::execute();
+    if ( result_is_hit() )
+    {
+      if ( result == RESULT_CRIT )
+      {
+        p -> buffs_glyph_of_shadow -> trigger();
+      }
+    }
     update_stats( DMG_DIRECT );
   }
 
@@ -980,10 +988,11 @@ struct mind_blast_t : public priest_spell_t
       if ( result == RESULT_CRIT )
       {
         p -> buffs_improved_spirit_tap -> trigger();
+        p -> buffs_glyph_of_shadow -> trigger();
       }
       if ( p -> active_vampiric_touch )
       {
-	p -> trigger_replenishment();
+	      p -> trigger_replenishment();
       }
     }
     p -> _cooldowns.mind_blast = cooldown_ready;
@@ -1057,6 +1066,7 @@ struct shadow_word_death_t : public priest_spell_t
       if ( result == RESULT_CRIT )
       {
         p -> buffs_improved_spirit_tap -> trigger();
+        p -> buffs_glyph_of_shadow -> trigger();
       }
     }
   }
@@ -1155,6 +1165,10 @@ struct mind_flay_tick_t : public priest_spell_t
         {
           p -> active_shadow_word_pain -> refresh_duration();
         }
+      }
+      if ( result == RESULT_CRIT )
+      {
+        p -> buffs_glyph_of_shadow -> trigger();
       }
     }
   }
@@ -1540,8 +1554,8 @@ struct fortitude_t : public priest_spell_t
     {
       if ( p -> ooc_buffs() )
       {
-	p -> buffs.fortitude -> trigger( 1, bonus );
-	p -> init_resources( true );
+	      p -> buffs.fortitude -> trigger( 1, bonus );
+	      p -> init_resources( true );
       }
     }
   }
@@ -1938,7 +1952,7 @@ void priest_t::init_buffs()
   player_t::init_buffs();
 
   // buff_t( sim, player, name, max_stack, duration, cooldown, proc_chance, quiet )
-  buffs_glyph_of_shadow     = new buff_t( this, "glyph_of_shadow"                                                 );
+  buffs_glyph_of_shadow     = new buff_t( this, "glyph_of_shadow",     1, 10.0                                    );
   buffs_improved_spirit_tap = new buff_t( this, "improved_spirit_tap", 1, 8.0                                     );
   buffs_inner_fire          = new buff_t( this, "inner_fire"                                                      );
   buffs_inner_fire_armor    = new buff_t( this, "inner_fire_armor"                                                );
