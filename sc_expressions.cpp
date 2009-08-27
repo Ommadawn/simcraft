@@ -143,10 +143,10 @@ struct global_expression_t: public act_expression_t
     {
     case EFG_GCD:        return action->gcd();
     case EFG_TIME:       return action->sim->current_time;
-    case EFG_TTD:        return action->sim -> target -> time_to_die();
-    case EFG_HP:         return action->sim -> target -> health_percentage();
-    case EFG_VULN:       return action->sim -> target -> vulnerable;
-    case EFG_INVUL:      return action->sim -> target -> invulnerable;
+    case EFG_TTD:        return action->sim->target -> time_to_die();
+    case EFG_HP:         return action->sim->target -> health_percentage();
+    case EFG_VULN:       return action->sim->target -> debuffs.vulnerable -> check();
+    case EFG_INVUL:      return action->sim->target -> debuffs.invulnerable -> check();
     case EFG_TICKING:    return action->ticking;
     case EFG_CTICK:      return action->current_tick;
     case EFG_NTICKS:     return action->num_ticks;
@@ -157,7 +157,7 @@ struct global_expression_t: public act_expression_t
       return rem>0? rem:0;
     }
     case EFG_TCAST:      return action->execute_time();
-    case EFG_MOVING:     return action->player->moving;
+    case EFG_MOVING:     return action->player->buffs.moving->check();
     case EFG_DISTANCE:   return action->player->distance;
     case EFG_MANA_PERC:
     {
@@ -489,7 +489,7 @@ act_expression_t* act_expression_t::create( action_t* action, std::string& expre
         {
           bool sfx_stacks=( suffix=="value" )||( suffix=="buff" ) || ( suffix=="stacks" );
           if ( ( suffix=="" )&&( expected_type==ETP_BOOL ) ) sfx_stacks=true;
-          if ( !sfx_stacks )
+          if ( sfx_stacks )
           {
             int method=1;
             if ( ( suffix=="time_to_think" )||( suffix=="think" ) ) method=2;

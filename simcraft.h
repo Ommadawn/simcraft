@@ -1021,7 +1021,6 @@ struct sim_t
   rng_t*    get_rng( const std::string& name, int type=RNG_DEFAULT );
   player_t* find_player( const std::string& name );
   void      use_optimal_buffs_and_debuffs( int value );
-  void      use_spell_crit_suppression( int value );
   void      aura_gain( const char* name, int aura_id=0 );
   void      aura_loss( const char* name, int aura_id=0 );
 };
@@ -1198,7 +1197,7 @@ struct player_t
   player_t*   next;
   int         index, type, level, tank, party, member;
   double      skill, distance, gcd_ready, base_gcd;
-  int         potion_used, stunned, moving, sleeping, initialized;
+  int         potion_used, sleeping, initialized;
   rating_t    rating;
   pet_t*      pet_list;
   int64_t     last_modified;
@@ -1364,22 +1363,15 @@ struct player_t
     buff_t* mark_of_the_wild;
     buff_t* mongoose_mh;
     buff_t* mongoose_oh;
+    buff_t* moving;
     buff_t* power_infusion;
     buff_t* hysteria;
     buff_t* replenishment;
+    buff_t* stunned;
     buff_t* tricks_of_the_trade;
     buffs_t() { memset( (void*) this, 0x0, sizeof( buffs_t ) ); }
   };
   buffs_t buffs;
-
-  struct uptimes_t
-  {
-    uptime_t* moving;
-    uptime_t* stunned;
-    void reset() { memset( ( void* ) this, 0x00, sizeof( uptimes_t ) ); }
-    uptimes_t() { reset(); }
-  };
-  uptimes_t uptimes;
 
   struct gains_t
   {
@@ -1689,9 +1681,6 @@ struct target_t
   int initial_armor, armor;
   int block_value;
   int shield;
-  int vulnerable;
-  int invulnerable;
-  int casting;
   double attack_speed, attack_damage;
   double initial_health, current_health;
   double total_dmg;
@@ -1699,8 +1688,10 @@ struct target_t
 
   struct debuffs_t
   {
-    // New Buffs
+    debuff_t* bleeding;
     debuff_t* blood_frenzy;
+    debuff_t* casting;
+    debuff_t* crypt_fever;
     debuff_t* curse_of_elements;
     debuff_t* earth_and_moon;
     debuff_t* faerie_fire;
@@ -1710,27 +1701,25 @@ struct target_t
     debuff_t* improved_scorch;
     debuff_t* improved_shadow_bolt;
     debuff_t* invulnerable;
+    debuff_t* judgement_of_wisdom;
     debuff_t* mangle;
     debuff_t* misery;
     debuff_t* slow;
+    debuff_t* sunder_armor;
+    debuff_t* thunder_clap;
     debuff_t* totem_of_wrath;
     debuff_t* trauma;
     debuff_t* vulnerable;
     debuff_t* winters_chill;
     debuff_t* winters_grasp;
-    // Old Buffs
+
     int    old_buffs;
-    int    bleeding;
-    int    crypt_fever;
     double expose_armor;
     double hemorrhage;
     int    hemorrhage_charges;
-    int    judgement_of_wisdom;
     int    master_poisoner;
     int    poisoned;
     int    savage_combat;
-    double sunder_armor;
-    int    thunder_clap;
     debuffs_t() { memset( (void*) this, 0x0, sizeof( debuffs_t ) ); }
     void reset()
     { 
@@ -1738,7 +1727,7 @@ struct target_t
       memset( (void*) &old_buffs, 0x0, sizeof( debuffs_t ) - delta );
     }
     bool frozen() { return frostbite -> check() || winters_grasp -> check(); }
-    bool snared() { return frozen() || slow -> check() || thunder_clap; }
+    bool snared() { return frozen() || slow -> check() || thunder_clap -> check(); }
   };
   debuffs_t debuffs;
 
@@ -1753,10 +1742,8 @@ struct target_t
 
   struct uptimes_t
   {
-    uptime_t* invulnerable;
     uptime_t* master_poisoner;
     uptime_t* savage_combat;
-    uptime_t* vulnerable;
     void reset() { memset( ( void* ) this, 0x00, sizeof( uptimes_t ) ); }
     uptimes_t() { reset(); }
   };

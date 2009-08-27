@@ -14,7 +14,6 @@
 target_t::target_t( sim_t* s ) :
     sim( s ), name_str( "Fluffy Pillow" ), race( RACE_HUMANOID ), level( 83 ),
     initial_armor( -1 ), armor( 0 ), block_value( 0 ), shield( 0 ),
-    vulnerable( 0 ), invulnerable( 0 ), casting( 0 ),
     attack_speed( 2.0 ), attack_damage( 2000 ),
     initial_health( 0 ), current_health( 0 ), total_dmg( 0 ), uptime_list( 0 )
 {
@@ -193,10 +192,15 @@ void target_t::init()
     }
   }
 
-  uptimes.invulnerable         = get_uptime( "invulnerable"         );
+  // Infinite-Stacking De-Buffs
+  debuffs.bleeding     = new debuff_t( sim, "bleeding",     -1 );
+  debuffs.casting      = new debuff_t( sim, "casting",      -1 );
+  debuffs.crypt_fever  = new debuff_t( sim, "crypt_fever",  -1 );
+  debuffs.invulnerable = new debuff_t( sim, "invulnerable", -1 );
+  debuffs.vulnerable   = new debuff_t( sim, "vulnerable",   -1 );
+
   uptimes.master_poisoner      = get_uptime( "master_poisoner"      );
   uptimes.savage_combat        = get_uptime( "savage_combat"        );
-  uptimes.vulnerable           = get_uptime( "vulnerable"           );
 }
 
 // target_t::reset ===========================================================
@@ -209,23 +213,16 @@ void target_t::reset()
   current_health = initial_health;
   debuffs.reset();
   expirations.reset();
-  invulnerable = 0;
-  vulnerable = 0;
-  casting = 0;
 }
 
 // target_t::combat_begin ====================================================
 
 void target_t::combat_begin()
 {
-  if ( sim -> overrides.bleeding              ) debuffs.bleeding = 1;
-  if ( sim -> overrides.crypt_fever           ) debuffs.crypt_fever = 1;
-  if ( sim -> overrides.judgement_of_wisdom   ) debuffs.judgement_of_wisdom = 1;
-  if ( sim -> overrides.master_poisoner       ) debuffs.master_poisoner = 1;
-  if ( sim -> overrides.poisoned              ) debuffs.poisoned = 1;
-  if ( sim -> overrides.savage_combat         ) debuffs.savage_combat = 1;
-  if ( sim -> overrides.sunder_armor          ) debuffs.sunder_armor = 0.20;
-  if ( sim -> overrides.thunder_clap          ) debuffs.thunder_clap = 1;
+  if ( sim -> overrides.bleeding        ) debuffs.bleeding -> override();
+  if ( sim -> overrides.master_poisoner ) debuffs.master_poisoner = 1;
+  if ( sim -> overrides.poisoned        ) debuffs.poisoned = 1;
+  if ( sim -> overrides.savage_combat   ) debuffs.savage_combat = 1;
 
   if ( sim -> overrides.bloodlust )
   {
