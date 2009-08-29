@@ -736,12 +736,6 @@ static void print_html_raid( FILE*  file, sim_t* sim )
     util_t::fprintf( file, "<img src=\"%s\" />\n", sim -> downtime_chart.c_str() );
   }
 
-  if ( ! sim -> uptimes_chart.empty() )
-  {
-    util_t::fprintf( file, "\n<!-- Global Up-Times: -->\n" );
-    util_t::fprintf( file, "<img src=\"%s\" />\n", sim -> uptimes_chart.c_str() );
-  }
-
   count = sim -> dpet_charts.size();
   for ( int i=0; i < count; i++ )
   {
@@ -915,11 +909,6 @@ static void print_xml_raid( FILE*  file, sim_t* sim )
     util_t::fprintf( file, "    <chart name=\"Raid Downtime\" url=\"%s\" />\n", sim -> downtime_chart.c_str() );
   }
 
-  if ( ! sim -> uptimes_chart.empty() )
-  {
-    util_t::fprintf( file, "    <chart name=\"Global Up-Times\" url=\"%s\" />\n", sim -> uptimes_chart.c_str() );
-  }
-
   count = sim -> dpet_charts.size();
   for ( int i=0; i < count; i++ )
   {
@@ -1017,20 +1006,14 @@ static void print_wiki_raid( FILE*  file,
   }
 
   std::string raid_downtime = "No chart for Raid Down-Time";
-  std::string raid_uptimes  = "No chart for Raid Up-Times";
 
   if ( ! sim -> downtime_chart.empty() )
   {
     raid_downtime = sim -> downtime_chart + "&dummy=dummy.png";
     simplify_html( raid_downtime );
   }
-  if ( ! sim -> uptimes_chart.empty() )
-  {
-    raid_uptimes = sim -> uptimes_chart + "&dummy=dummy.png";
-    simplify_html( raid_uptimes );
-  }
 
-  util_t::fprintf( file, "|| %s || %s ||\n", raid_downtime.c_str(), raid_uptimes.c_str() );
+  util_t::fprintf( file, "|| %s || ||\n", raid_downtime.c_str() );
 
   count = sim -> dpet_charts.size();
   for ( int i=0; i < count; i++ )
@@ -1242,21 +1225,23 @@ void report_t::print_text( FILE* file, sim_t* sim, bool detail )
   {
     player_t* p = sim -> players_by_name[ i ];
 
-    util_t::fprintf( file, "\nPlayer=%s (%s)  DPS=%.1f (Error=+/-%.1f Range=+/-%.0f)",
-                     p -> name(), util_t::talent_tree_string( p -> primary_tree() ),
+    util_t::fprintf( file, "\nPlayer: %s %s %s %s %d\n",
+                     p -> name(), p -> race_str.c_str(), 
+		     util_t::player_type_string( p -> type ),
+		     util_t::talent_tree_string( p -> primary_tree() ), p -> level );
+
+    util_t::fprintf( file, "  DPS: %.1f  Error=%.1f  Range=%.0f",
                      p -> dps, p -> dps_error, ( p -> dps_max - p -> dps_min ) / 2.0 );
 
     if ( p -> rps_loss > 0 )
     {
-      util_t::fprintf( file, "  DPR=%.1f  RS=%.1f/%.1f  (%s)",
+      util_t::fprintf( file, "  DPR=%.1f  RPS=%.1f/%.1f  (%s)",
                        p -> dpr, p -> rps_loss, p -> rps_gain,
                        util_t::resource_type_string( p -> primary_resource() ) );
     }
 
     util_t::fprintf( file, "\n" );
     util_t::fprintf( file, "  Origin: %s\n", p -> origin_str.c_str() );
-    util_t::fprintf( file, "  Race: %s\n",   p -> race_str.c_str() );
-    util_t::fprintf( file, "  Level: %d\n",  p -> level );
 
     print_core_stats   ( file, p );
     print_spell_stats  ( file, p );
