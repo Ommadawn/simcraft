@@ -128,7 +128,7 @@ enum race_type
 {
   RACE_NONE=0,
   // Target Races
-  RACE_BEAST, RACE_DRAGONKIN, RACE_GIANT, RACE_HUMANOID,
+  RACE_BEAST, RACE_DRAGONKIN, RACE_GIANT, RACE_HUMANOID, RACE_DEMON, RACE_ELEMENTAL,
   // Player Races
   RACE_NIGHT_ELF, RACE_HUMAN, RACE_GNOME, RACE_DWARF, RACE_DRAENEI, RACE_ORC, RACE_TROLL, RACE_UNDEAD, RACE_BLOOD_ELF, RACE_TAUREN,
   RACE_MAX
@@ -179,6 +179,8 @@ enum proc_type
   PROC_ATTACK,
   PROC_SPELL,
   PROC_TICK,
+  PROC_ATTACK_DIRECT,
+  PROC_SPELL_DIRECT,
   PROC_MAX
 };
 
@@ -1062,7 +1064,7 @@ struct rating_t
   double attack_haste, attack_hit, attack_crit;
   double expertise, armor_penetration;
   rating_t() { memset( this, 0x00, sizeof( rating_t ) ); }
-  void init( int level );
+  void init( sim_t*, int level );
   static double interpolate( int level, double val_60, double val_70, double val_80 );
   static double get_attribute_base( int level, int class_type, int race, int stat_type );
 };
@@ -1288,10 +1290,12 @@ struct player_t
   bool      action_queued;
 
   // Callbacks
-  std::vector<action_callback_t*> resource_gain_callbacks[ RESOURCE_MAX ];
-  std::vector<action_callback_t*> resource_loss_callbacks[ RESOURCE_MAX ];
-  std::vector<action_callback_t*> attack_result_callbacks[ RESULT_MAX ];
-  std::vector<action_callback_t*>  spell_result_callbacks[ RESULT_MAX ];
+  std::vector<action_callback_t*> resource_gain_callbacks       [ RESOURCE_MAX ];
+  std::vector<action_callback_t*> resource_loss_callbacks       [ RESOURCE_MAX ];
+  std::vector<action_callback_t*> attack_result_callbacks       [ RESULT_MAX ];
+  std::vector<action_callback_t*> spell_result_callbacks        [ RESULT_MAX ];
+  std::vector<action_callback_t*> attack_direct_result_callbacks[ RESULT_MAX ];
+  std::vector<action_callback_t*> spell_direct_result_callbacks [ RESULT_MAX ];
   std::vector<action_callback_t*> tick_callbacks;
   std::vector<action_callback_t*> tick_damage_callbacks;
   std::vector<action_callback_t*> direct_damage_callbacks;
@@ -1322,7 +1326,7 @@ struct player_t
   std::vector<double> timeline_dps;
   std::vector<double> iteration_dps;
   std::vector<int> distribution_dps;
-  std::string action_dpet_chart, action_dmg_chart, gains_chart, uptimes_and_procs_chart;
+  std::string action_dpet_chart, action_dmg_chart, gains_chart;
   std::string timeline_resource_chart, timeline_dps_chart, distribution_dps_chart;
   std::string gear_weights_lootrank_link, gear_weights_wowhead_link, gear_weights_pawn_string;
   std::string save_str;
@@ -1508,13 +1512,15 @@ struct player_t
   virtual void target_swing() {}
 
   virtual void register_callbacks();
-  virtual void register_resource_gain_callback( int resource, action_callback_t* );
-  virtual void register_resource_loss_callback( int resource, action_callback_t* );
-  virtual void register_attack_result_callback( int result_mask, action_callback_t* );
-  virtual void register_spell_result_callback ( int result_mask, action_callback_t* );
-  virtual void register_tick_callback         ( action_callback_t* );
-  virtual void register_tick_damage_callback  ( action_callback_t* );
-  virtual void register_direct_damage_callback( action_callback_t* );
+  virtual void register_resource_gain_callback       ( int resource, action_callback_t* );
+  virtual void register_resource_loss_callback       ( int resource, action_callback_t* );
+  virtual void register_attack_result_callback       ( int result_mask, action_callback_t* );
+  virtual void register_spell_result_callback        ( int result_mask, action_callback_t* );
+  virtual void register_attack_direct_result_callback( int result_mask, action_callback_t* );
+  virtual void register_spell_direct_result_callback ( int result_mask, action_callback_t* );
+  virtual void register_tick_callback                ( action_callback_t* );
+  virtual void register_tick_damage_callback         ( action_callback_t* );
+  virtual void register_direct_damage_callback       ( action_callback_t* );
 
   virtual bool get_talent_translation( std::vector<int*>& tree, talent_translation_t translation[] );
   virtual bool get_talent_translation( std::vector<int*>& tree1, std::vector<int*>& tree2, std::vector<int*>& tree3, talent_translation_t translation[][3] );
@@ -2209,7 +2215,6 @@ struct chart_t
   static const char* action_dpet      ( std::string& s, player_t* );
   static const char* action_dmg       ( std::string& s, player_t* );
   static const char* gains            ( std::string& s, player_t* );
-  static const char* uptimes_and_procs( std::string& s, player_t* );
   static const char* timeline_resource( std::string& s, player_t* );
   static const char* timeline_dps     ( std::string& s, player_t* );
   static const char* distribution_dps ( std::string& s, player_t* );

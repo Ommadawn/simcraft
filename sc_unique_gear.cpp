@@ -202,6 +202,14 @@ action_callback_t* unique_gear_t::register_stat_proc( int                type,
   {
     player -> register_spell_result_callback( mask, cb );
   }
+  else if ( type == PROC_ATTACK_DIRECT )
+  {
+    player -> register_attack_direct_result_callback( mask, cb );
+  }
+  else if ( type == PROC_SPELL_DIRECT )
+  {
+    player -> register_spell_direct_result_callback( mask, cb );
+  }
 
   return cb;
 }
@@ -241,7 +249,14 @@ action_callback_t* unique_gear_t::register_discharge_proc( int                ty
   {
     player -> register_spell_result_callback( mask, cb );
   }
-
+  else if ( type == PROC_ATTACK_DIRECT )
+  {
+    player -> register_attack_direct_result_callback( mask, cb );
+  }
+  else if ( type == PROC_SPELL_DIRECT )
+  {
+    player -> register_spell_direct_result_callback( mask, cb );
+  }
   return cb;
 }
 
@@ -280,7 +295,7 @@ bool unique_gear_t::get_equip_encoding( std::string&       encoding,
   std::string e;
 
   // Stat Procs
-  if     ( name == "abyssal_rune"                    ) e = "OnSpellHit_590SP_25%_10Dur_45Cd";
+  if      ( name == "abyssal_rune"                    ) e = "OnSpellHit_590SP_25%_10Dur_45Cd";
   else if ( name == "banner_of_victory"               ) e = "OnAttackHit_1008AP_20%_10Dur_50Cd";
   else if ( name == "blood_of_the_old_god"            ) e = "OnAttackCrit_1284AP_10%_10Dur_50Cd";
   else if ( name == "chuchus_tiny_box_of_horrors"     ) e = "OnAttackHit_258Crit_15%_10Dur_45Cd";
@@ -292,7 +307,7 @@ bool unique_gear_t::get_equip_encoding( std::string&       encoding,
   else if ( name == "embrace_of_the_spider"           ) e = "OnSpellHit_505Haste_10%_10Dur_45Cd";
   else if ( name == "eye_of_magtheridon"              ) e = "OnSpellMiss_170SP_10Dur";
   else if ( name == "eye_of_the_broodmother"          ) e = "OnSpellHit_25SP_5Stack_10Dur";
-  else if ( name == "flare_of_the_heavens"            ) e = "OnSpellHit_850SP_10%_10Dur_45Cd";
+  else if ( name == "flare_of_the_heavens"            ) e = "OnSpellCast_850SP_10%_10Dur_45Cd";
   else if ( name == "forge_ember"                     ) e = "OnSpellHit_512SP_10%_10Dur_45Cd";
   else if ( name == "fury_of_the_five_flights"        ) e = "OnAttackHit_16AP_20Stack_10Dur";
   else if ( name == "grim_toll"                       ) e = "OnAttackHit_612ArPen_15%_10Dur_45Cd";
@@ -305,19 +320,19 @@ bool unique_gear_t::get_equip_encoding( std::string&       encoding,
   else if ( name == "quagmirrans_eye"                 ) e = "OnSpellHit_320Haste_10%_6Dur_45Cd";
   else if ( name == "sextant_of_unstable_currents"    ) e = "OnSpellCrit_190SP_20%_15Dur_45Cd";
   else if ( name == "shiffars_nexus_horn"             ) e = "OnSpellCrit_225SP_20%_10Dur_45Cd";
-  else if ( name == "sundial_of_the_exiled"           ) e = "OnSpellHit_590SP_10%_10Dur_45Cd";
+  else if ( name == "sundial_of_the_exiled"           ) e = "OnSpellCast_590SP_10%_10Dur_45Cd";
   else if ( name == "wrath_of_cenarius"               ) e = "OnSpellHit_132SP_5%_10Dur";
 
   // Discharge Procs
   else if ( name == "bandits_insignia"             ) e = "OnAttackHit_1880Arcane_15%_45Cd";
   else if ( name == "extract_of_necromantic_power" ) e = "OnTick_1050Shadow_10%_15Cd";
-  else if ( name == "lightning_capacitor"          ) e = "OnSpellCrit_750Nature_3Stack_2.5Cd";
+  else if ( name == "lightning_capacitor"          ) e = "OnSpellDirectCrit_750Nature_3Stack_2.5Cd";
   else if ( name == "timbals_crystal"              ) e = "OnTick_380Shadow_10%_15Cd";
-  else if ( name == "thunder_capacitor"            ) e = "OnSpellCrit_1276Nature_4Stack_2.5Cd";
+  else if ( name == "thunder_capacitor"            ) e = "OnSpellDirectCrit_1276Nature_4Stack_2.5Cd";
 
   // Some Normal/Heroic items have same name
-  else if ( name == "reign_of_the_unliving" ) e = ( id == "47182" ? "OnSpellCrit_1882Fire_3Stack_2.0Cd" : "OnSpellCrit_2117Fire_3Stack_2.0Cd" );
-  else if ( name == "reign_of_the_dead"     ) e = ( id == "47316" ? "OnSpellCrit_1882Fire_3Stack_2.0Cd" : "OnSpellCrit_2117Fire_3Stack_2.0Cd" );
+  else if ( name == "reign_of_the_unliving" ) e = ( id == "47182" ? "OnSpellDirectCrit_1882Fire_3Stack_2.0Cd" : "OnSpellDirectCrit_2117Fire_3Stack_2.0Cd" );
+  else if ( name == "reign_of_the_dead"     ) e = ( id == "47316" ? "OnSpellDirectCrit_1882Fire_3Stack_2.0Cd" : "OnSpellDirectCrit_2117Fire_3Stack_2.0Cd" );
 
   // Enchants
   else if ( name == "lightweave"            ) e = "OnSpellHit_295SP_35%_15Dur_60Cd";  // temporary for backwards compatibility
