@@ -323,7 +323,7 @@ enum stat_type
   STAT_ATTACK_POWER, STAT_EXPERTISE_RATING, STAT_ARMOR_PENETRATION_RATING,
   STAT_HIT_RATING, STAT_CRIT_RATING, STAT_HASTE_RATING,
   STAT_WEAPON_DPS, STAT_WEAPON_SPEED,
-  STAT_ARMOR,
+  STAT_ARMOR, STAT_BLOCK_VALUE,
   STAT_MAX
 };
 
@@ -671,6 +671,7 @@ struct gear_stats_t
   double weapon_dps;
   double weapon_speed;
   double armor;
+  double block_value;
 
   gear_stats_t() { memset( ( void* ) this, 0x00, sizeof( gear_stats_t ) ); }
 
@@ -903,6 +904,7 @@ struct sim_t
     int flametongue_totem;
     int focus_magic;
     int fortitude;
+    int heart_of_the_crusader;
     int heroic_presence;
     int hunters_mark;
     int improved_faerie_fire;
@@ -910,6 +912,7 @@ struct sim_t
     int improved_scorch;
     int improved_shadow_bolt;
     int judgement_of_wisdom;
+    int judgements_of_the_just;
     int leader_of_the_pack;
     int mana_spring_totem;
     int mangle;
@@ -1260,6 +1263,7 @@ struct player_t
   // Defense Mechanics
   event_t* target_auto_attack;
   double base_armor, initial_armor, armor, armor_snapshot;
+  double base_block_value, initial_block_value, block_value;
   double armor_per_agility;
   bool   use_armor_snapshot;
 
@@ -1470,12 +1474,13 @@ struct player_t
 
   virtual double composite_attack_power() SC_CONST;
   virtual double composite_attack_crit() SC_CONST;
-  virtual double composite_attack_expertise() SC_CONST   { return attack_expertise; }
+  virtual double composite_attack_expertise() SC_CONST { return attack_expertise; }
   virtual double composite_attack_hit() SC_CONST;
   virtual double composite_attack_penetration() SC_CONST { return attack_penetration; }
 
   virtual double composite_armor() SC_CONST;
-  virtual double composite_armor_snapshot() SC_CONST    { return armor_snapshot; }
+  virtual double composite_armor_snapshot() SC_CONST { return armor_snapshot; }
+  virtual double composite_block_value() SC_CONST { return block_value; }
 
   virtual double composite_spell_power( int school ) SC_CONST;
   virtual double composite_spell_crit() SC_CONST;
@@ -1708,12 +1713,14 @@ struct target_t
     debuff_t* earth_and_moon;
     debuff_t* faerie_fire;
     debuff_t* frostbite;
+    debuff_t* heart_of_the_crusader;
     debuff_t* hunters_mark;
     debuff_t* improved_faerie_fire;
     debuff_t* improved_scorch;
     debuff_t* improved_shadow_bolt;
     debuff_t* invulnerable;
     debuff_t* judgement_of_wisdom;
+    debuff_t* judgements_of_the_just;
     debuff_t* mangle;
     debuff_t* misery;
     debuff_t* slow;
@@ -1731,7 +1738,7 @@ struct target_t
     debuff_t* hemorrhage;
     debuffs_t() { memset( (void*) this, 0x0, sizeof( debuffs_t ) ); }
     bool frozen() { return frostbite -> check() || winters_grasp -> check(); }
-    bool snared() { return frozen() || slow -> check() || thunder_clap -> check(); }
+    bool snared() { return frozen() || judgements_of_the_just -> check() || slow -> check() || thunder_clap -> check(); }
   };
   debuffs_t debuffs;
 
