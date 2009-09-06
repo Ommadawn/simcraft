@@ -1,0 +1,157 @@
+// !$*UTF8*$!
+{
+	08FB7793FE84155DC02AAC07 /* Project object */ = {
+		activeBuildConfigurationName = Release;
+		activeExecutable = 44E3D112105459F100677DEB /* simcraft */;
+		activeTarget = 8DD76F620486A84900D96B5E /* simcraft */;
+		addToTargets = (
+		);
+		codeSenseManager = 44E3D117105459FA00677DEB /* Code sense */;
+		executables = (
+			44E3D112105459F100677DEB /* simcraft */,
+		);
+		perUserDictionary = {
+			PBXConfiguration.PBXFileTableDataSource3.PBXFileTableDataSource = {
+				PBXFileTableDataSourceColumnSortingDirectionKey = "-1";
+				PBXFileTableDataSourceColumnSortingKey = PBXFileDataSource_Filename_ColumnID;
+				PBXFileTableDataSourceColumnWidthsKey = (
+					20,
+					637,
+					20,
+					48,
+					43,
+					43,
+					20,
+				);
+				PBXFileTableDataSourceColumnsKey = (
+					PBXFileDataSource_FiletypeID,
+					PBXFileDataSource_Filename_ColumnID,
+					PBXFileDataSource_Built_ColumnID,
+					PBXFileDataSource_ObjectSize_ColumnID,
+					PBXFileDataSource_Errors_ColumnID,
+					PBXFileDataSource_Warnings_ColumnID,
+					PBXFileDataSource_Target_ColumnID,
+				);
+			};
+			PBXPerProjectTemplateStateSaveDate = 273963540;
+			PBXWorkspaceStateSaveDate = 273963540;
+		};
+		perUserProjectItems = {
+			44E3D22E10545E8000677DEB /* PBXTextBookmark */ = 44E3D22E10545E8000677DEB /* PBXTextBookmark */;
+			44E3D22F10545E8000677DEB /* PBXTextBookmark */ = 44E3D22F10545E8000677DEB /* PBXTextBookmark */;
+			44E3D23010545E8000677DEB /* PBXTextBookmark */ = 44E3D23010545E8000677DEB /* PBXTextBookmark */;
+			44E3D23110545E8000677DEB /* PBXTextBookmark */ = 44E3D23110545E8000677DEB /* PBXTextBookmark */;
+		};
+		sourceControlManager = 44E3D116105459FA00677DEB /* Source Control */;
+		userBuildSettings = {
+		};
+	};
+	44E3D112105459F100677DEB /* simcraft */ = {
+		isa = PBXExecutable;
+		activeArgIndices = (
+		);
+		argumentStrings = (
+		);
+		autoAttachOnCrash = 1;
+		breakpointsEnabled = 0;
+		configStateDict = {
+		};
+		customDataFormattersEnabled = 1;
+		dataTipCustomDataFormattersEnabled = 1;
+		dataTipShowTypeColumn = 1;
+		dataTipSortType = 0;
+		debuggerPlugin = GDBDebugging;
+		disassemblyDisplayState = 0;
+		enableDebugStr = 1;
+		environmentEntries = (
+		);
+		executableSystemSymbolLevel = 0;
+		executableUserSymbolLevel = 0;
+		libgmallocEnabled = 0;
+		name = simcraft;
+		showTypeColumn = 0;
+		sourceDirectories = (
+		);
+	};
+	44E3D116105459FA00677DEB /* Source Control */ = {
+		isa = PBXSourceControlManager;
+		fallbackIsa = XCSourceControlManager;
+		isSCMEnabled = 0;
+		scmConfiguration = {
+			repositoryNamesForRoots = {
+				"" = "";
+			};
+		};
+	};
+	44E3D117105459FA00677DEB /* Code sense */ = {
+		isa = PBXCodeSenseManager;
+		indexTemplatePath = "";
+	};
+	44E3D12510545A4F00677DEB /* Death_Knight_T8_51_00_20.simcraft */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {1027, 689}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{0, 0}";
+		};
+	};
+	44E3D1DB10545A7500677DEB /* sc_shaman.cpp */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {775, 41171}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{0, 0}";
+		};
+	};
+	44E3D21C10545AD700677DEB /* README.txt */ = {
+		uiCtxt = {
+			sepNavIntBoundsRect = "{{0, 0}, {815, 494}}";
+			sepNavSelRange = "{0, 0}";
+			sepNavVisRange = "{0, 0}";
+		};
+	};
+	44E3D22E10545E8000677DEB /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 44E3D21C10545AD700677DEB /* README.txt */;
+		name = "README.txt: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 0;
+		vrLoc = 0;
+	};
+	44E3D22F10545E8000677DEB /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 44E3D1DB10545A7500677DEB /* sc_shaman.cpp */;
+		name = "sc_shaman.cpp: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 1300;
+		vrLoc = 0;
+	};
+	44E3D23010545E8000677DEB /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 44E3D12510545A4F00677DEB /* Death_Knight_T8_51_00_20.simcraft */;
+		name = "Death_Knight_T8_51_00_20.simcraft: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 2293;
+		vrLoc = 0;
+	};
+	44E3D23110545E8000677DEB /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 44E3D12510545A4F00677DEB /* Death_Knight_T8_51_00_20.simcraft */;
+		name = "Death_Knight_T8_51_00_20.simcraft: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 0;
+		vrLoc = 0;
+	};
+	8DD76F620486A84900D96B5E /* simcraft */ = {
+		activeExec = 0;
+		executables = (
+			44E3D112105459F100677DEB /* simcraft */,
+		);
+	};
+}
