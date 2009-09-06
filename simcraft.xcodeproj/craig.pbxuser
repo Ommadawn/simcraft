@@ -33,28 +33,57 @@
 					PBXFileDataSource_Target_ColumnID,
 				);
 			};
-			PBXPerProjectTemplateStateSaveDate = 273963540;
-			PBXWorkspaceStateSaveDate = 273963540;
+			PBXPerProjectTemplateStateSaveDate = 273965623;
+			PBXWorkspaceStateSaveDate = 273965623;
 		};
 		perUserProjectItems = {
+			44BC6614105464BD0082D3B2 /* PBXTextBookmark */ = 44BC6614105464BD0082D3B2 /* PBXTextBookmark */;
 			44E3D22E10545E8000677DEB /* PBXTextBookmark */ = 44E3D22E10545E8000677DEB /* PBXTextBookmark */;
 			44E3D22F10545E8000677DEB /* PBXTextBookmark */ = 44E3D22F10545E8000677DEB /* PBXTextBookmark */;
-			44E3D23010545E8000677DEB /* PBXTextBookmark */ = 44E3D23010545E8000677DEB /* PBXTextBookmark */;
 			44E3D23110545E8000677DEB /* PBXTextBookmark */ = 44E3D23110545E8000677DEB /* PBXTextBookmark */;
 		};
 		sourceControlManager = 44E3D116105459FA00677DEB /* Source Control */;
 		userBuildSettings = {
 		};
 	};
+	44BC6614105464BD0082D3B2 /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 44E3D12510545A4F00677DEB /* Death_Knight_T8_51_00_20.simcraft */;
+		name = "Death_Knight_T8_51_00_20.simcraft: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 0;
+		vrLoc = 0;
+	};
 	44E3D112105459F100677DEB /* simcraft */ = {
 		isa = PBXExecutable;
 		activeArgIndices = (
+			YES,
+			YES,
 		);
 		argumentStrings = (
+			Raid_T8.simcraft,
+			"threads=4",
 		);
 		autoAttachOnCrash = 1;
 		breakpointsEnabled = 0;
 		configStateDict = {
+			"PBXLSLaunchAction-0" = {
+				PBXLSLaunchAction = 0;
+				PBXLSLaunchStartAction = 1;
+				PBXLSLaunchStdioStyle = 2;
+				PBXLSLaunchStyle = 0;
+				class = PBXLSRunLaunchConfig;
+				commandLineArgs = (
+				);
+				displayName = "Executable Runner";
+				environment = {
+				};
+				identifier = com.apple.Xcode.launch.runConfig;
+				remoteHostInfo = "";
+				startActionInfo = "";
+			};
 		};
 		customDataFormattersEnabled = 1;
 		dataTipCustomDataFormattersEnabled = 1;
@@ -62,6 +91,7 @@
 		dataTipSortType = 0;
 		debuggerPlugin = GDBDebugging;
 		disassemblyDisplayState = 0;
+		dylibVariantSuffix = "";
 		enableDebugStr = 1;
 		environmentEntries = (
 		);
@@ -69,9 +99,12 @@
 		executableUserSymbolLevel = 0;
 		libgmallocEnabled = 0;
 		name = simcraft;
+		savedGlobals = {
+		};
 		showTypeColumn = 0;
 		sourceDirectories = (
 		);
+		startupPath = "<<ProjectDirectory>>";
 	};
 	44E3D116105459FA00677DEB /* Source Control */ = {
 		isa = PBXSourceControlManager;
@@ -89,7 +122,7 @@
 	};
 	44E3D12510545A4F00677DEB /* Death_Knight_T8_51_00_20.simcraft */ = {
 		uiCtxt = {
-			sepNavIntBoundsRect = "{{0, 0}, {1027, 689}}";
+			sepNavIntBoundsRect = "{{0, 0}, {815, 793}}";
 			sepNavSelRange = "{0, 0}";
 			sepNavVisRange = "{0, 0}";
 		};
@@ -126,16 +159,6 @@
 		rLoc = 0;
 		rType = 0;
 		vrLen = 1300;
-		vrLoc = 0;
-	};
-	44E3D23010545E8000677DEB /* PBXTextBookmark */ = {
-		isa = PBXTextBookmark;
-		fRef = 44E3D12510545A4F00677DEB /* Death_Knight_T8_51_00_20.simcraft */;
-		name = "Death_Knight_T8_51_00_20.simcraft: 1";
-		rLen = 0;
-		rLoc = 0;
-		rType = 0;
-		vrLen = 2293;
 		vrLoc = 0;
 	};
 	44E3D23110545E8000677DEB /* PBXTextBookmark */ = {
