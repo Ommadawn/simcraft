@@ -33,18 +33,28 @@
 					PBXFileDataSource_Target_ColumnID,
 				);
 			};
-			PBXPerProjectTemplateStateSaveDate = 273965623;
-			PBXWorkspaceStateSaveDate = 273965623;
+			PBXPerProjectTemplateStateSaveDate = 273966393;
+			PBXWorkspaceStateSaveDate = 273966393;
 		};
 		perUserProjectItems = {
+			4476F76B10546571003E73BC /* PBXTextBookmark */ = 4476F76B10546571003E73BC /* PBXTextBookmark */;
 			44BC6614105464BD0082D3B2 /* PBXTextBookmark */ = 44BC6614105464BD0082D3B2 /* PBXTextBookmark */;
 			44E3D22E10545E8000677DEB /* PBXTextBookmark */ = 44E3D22E10545E8000677DEB /* PBXTextBookmark */;
 			44E3D22F10545E8000677DEB /* PBXTextBookmark */ = 44E3D22F10545E8000677DEB /* PBXTextBookmark */;
-			44E3D23110545E8000677DEB /* PBXTextBookmark */ = 44E3D23110545E8000677DEB /* PBXTextBookmark */;
 		};
 		sourceControlManager = 44E3D116105459FA00677DEB /* Source Control */;
 		userBuildSettings = {
 		};
+	};
+	4476F76B10546571003E73BC /* PBXTextBookmark */ = {
+		isa = PBXTextBookmark;
+		fRef = 44E3D12510545A4F00677DEB /* Death_Knight_T8_51_00_20.simcraft */;
+		name = "Death_Knight_T8_51_00_20.simcraft: 1";
+		rLen = 0;
+		rLoc = 0;
+		rType = 0;
+		vrLen = 0;
+		vrLoc = 0;
 	};
 	44BC6614105464BD0082D3B2 /* PBXTextBookmark */ = {
 		isa = PBXTextBookmark;
@@ -61,10 +71,12 @@
 		activeArgIndices = (
 			YES,
 			YES,
+			YES,
 		);
 		argumentStrings = (
 			Raid_T8.simcraft,
 			"threads=4",
+			"iterations=40",
 		);
 		autoAttachOnCrash = 1;
 		breakpointsEnabled = 0;
@@ -159,16 +171,6 @@
 		rLoc = 0;
 		rType = 0;
 		vrLen = 1300;
-		vrLoc = 0;
-	};
-	44E3D23110545E8000677DEB /* PBXTextBookmark */ = {
-		isa = PBXTextBookmark;
-		fRef = 44E3D12510545A4F00677DEB /* Death_Knight_T8_51_00_20.simcraft */;
-		name = "Death_Knight_T8_51_00_20.simcraft: 1";
-		rLen = 0;
-		rLoc = 0;
-		rType = 0;
-		vrLen = 0;
 		vrLoc = 0;
 	};
 	8DD76F620486A84900D96B5E /* simcraft */ = {
